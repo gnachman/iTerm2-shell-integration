@@ -18,7 +18,11 @@ if [[ -o interactive ]]; then
     ITERM2_SHOULD_DECORATE_PROMPT="1"
     # Indicates start of command output. Runs just before command executes.
     iterm2_before_cmd_executes() {
-      printf "\033]133;C;\007"
+      if [ "$TERM_PROGRAM" = "iTerm.app" ]; then
+        printf "\033]133;C;\r\007"
+      else
+        printf "\033]133;C;\007"
+      fi
     }
 
     iterm2_set_user_var() {

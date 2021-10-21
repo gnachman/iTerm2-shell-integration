@@ -523,6 +523,12 @@ if [ -z "${iterm2_hostname:-}" ]; then
   fi
 fi
 
+iterm2_maybe_print_cr() {
+  if [ "$TERM_PROGRAM" = "iTerm.app" ]; then
+    printf "\r"
+  fi
+}
+
 # Runs after interactively edited command but before execution
 __iterm2_preexec() {
     # Save the returned value from our last command
@@ -530,6 +536,7 @@ __iterm2_preexec() {
 
     iterm2_begin_osc
     printf "133;C;"
+    iterm2_maybe_print_cr
     iterm2_end_osc
     # If PS1 still has the value we set it to in iterm2_preexec_invoke_cmd then
     # restore it to its original value. It might have changed if you have

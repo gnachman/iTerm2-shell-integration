@@ -30,7 +30,11 @@ if begin; status --is-interactive; and not functions -q -- iterm2_status; and [ 
   # Tell terminal to create a mark at this location
   function iterm2_preexec --on-event fish_preexec
     # For other shells we would output status here but we can't do that in fish.
-    printf "\033]133;C;\007"
+    if [ "$TERM_PROGRAM" = "iTerm.app" ]
+      printf "\033]133;C;\r\007"
+    else
+      printf "\033]133;C;\007"
+    end
   end
 
   # Usage: iterm2_set_user_var key value
