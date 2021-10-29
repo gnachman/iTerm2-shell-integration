@@ -27,7 +27,7 @@ function join {
 
 type printf > /dev/null 2>&1 || die "Shell integration requires the printf binary to be in your path."
 
-UTILITIES=(imgcat imgls it2api it2attention it2check it2copy it2dl it2getvar it2git it2setcolor it2setkeylabel it2ul it2universion)
+UTILITIES=(imgcat imgls it2api it2attention it2check it2copy it2dl it2getvar it2git it2setcolor it2setkeylabel it2tip it2ul it2universion)
 SHELL=${SHELL##*/}
 URL=""
 HOME_PREFIX='${HOME}'
@@ -156,6 +156,8 @@ echo "it2setcolor ..."
 echo "  Changes individual color settings or loads a color preset."
 echo "it2setkeylabel ..."
 echo "  Changes Touch Bar function key labels."
+echo "it2tip"
+echo "  iTerm2 usage tips"
 echo "it2ul"
 echo "  Uploads a file."
 echo "it2universion"
