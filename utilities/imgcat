@@ -76,7 +76,7 @@ function print_image() {
 }
 
 function error() {
-    echo "ERROR: $*" 1>&2
+    errcho "ERROR: $*"
 }
 
 function errcho() {
@@ -85,7 +85,7 @@ function errcho() {
 
 function show_help() {
     errcho
-    errcho "Usage: imgcat [-p] [-q] [-W width] [-H height] [-r] [-s] [-u] [-f] filename ..."
+    errcho "Usage: imgcat [-p] [-n] [-W width] [-H height] [-r] [-s] [-u] [-f] filename ..."
     errcho "       cat filename | imgcat [-W width] [-H height] [-r] [-s]"
     errcho
     errcho "Display images inline in the iTerm2 using Inline Images Protocol"
@@ -93,19 +93,21 @@ function show_help() {
     errcho "Options:"
     errcho
     errcho "    -h, --help                      Display help message"
-    errcho "    -p, --print                     Enable printing of filename or URL after displaying each image"
-    errcho "    -q, --quiet                     Be quiet, disable filename printing (default)"
-    errcho "    -u, --url                       Interpret following filename arguments as remote URLs and fetch they using curl"
-    errcho "    -f, --file                      Interpret following filename arguments as regular Files (default)"
-    errcho "    -r, --preserve-aspect-ratio     When scaling image preserve its original aspect ratio (default)"
-    errcho "    -s, --stretch                   Stretch image to specified width and height, this option is opposite to -r"
+    errcho "    -p, --print                     Enable printing of filename or URL after each image"
+    errcho "    -n, --no-print                  Disable printing of filename or URL after each image"
+    errcho "    -u, --url                       Interpret following filename arguments as remote URLs"
+    errcho "    -f, --file                      Interpret following filename arguments as regular Files"
+    errcho "    -r, --preserve-aspect-ratio     When scaling image preserve its original aspect ratio"
+    errcho "    -s, --stretch                   Stretch image to specified width and height (this option is opposite to -r)"
     errcho "    -W, --width N                   Set image width to N character cells, pixels or percent (see below)"
     errcho "    -H, --height N                  Set image height to N character cells, pixels or percent (see below)"
     errcho
-    errcho "    The width and height are given as a number N followed by a unit:"
-    errcho "        N   character cells"
-    errcho "        Npx pixels"
-    errcho "        N%  percent of the session's width or height"
+    errcho "    If you don't specify width or height an appropriate value will be chosen automatically."
+    errcho "    The width and height are given as word 'auto' or number N followed by a unit:"
+    errcho "        N      character cells"
+    errcho "        Npx    pixels"
+    errcho "        N%     percent of the session's width or height"
+    errcho "        auto   the image's inherent size will be used to determine an appropriate dimension"
     errcho
     errcho "Examples:"
     errcho
@@ -141,7 +143,7 @@ else
 fi
 
 # Show help if no arguments and no stdin.
-if [ $has_stdin == f ] && [ $# -eq 0 ]; then
+if [ $has_stdin = f ] && [ $# -eq 0 ]; then
     show_help
     exit
 fi
@@ -159,7 +161,7 @@ while [ $# -gt 0 ]; do
     -p | --p | --print)
         print_filename=1
         ;;
-    -q | --q | --quiet)
+    -n | --n | --no-print)
         print_filename=0
         ;;
     -W | --W | --width)
@@ -217,7 +219,7 @@ if [ $has_stdin = t ]; then
 fi
 
 if [ "$has_image_displayed" != "t" ]; then
-    error "No image provided, check command line options"
+    error "No image provided. Check command line options."
     show_help
     exit 1
 fi
