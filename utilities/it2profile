@@ -52,7 +52,7 @@ function b64_decode() {
 }
 
 function error() {
-    echo "ERROR: $*" 1>&2
+    errcho "ERROR: $*"
 }
 
 function errcho() {
@@ -69,6 +69,7 @@ function show_help() {
     errcho "Options:"
     errcho
     errcho "    -s      Set current iTerm2 session profile to specified profile name"
+    errcho "                empty string refers to profile marked as Default"
     errcho "    -g      Get current iTerm2 session profile name"
     errcho "    -r      Reset to the session initial profile"
     errcho
@@ -92,6 +93,7 @@ function check_dependency() {
 # get currently active profile name.
 #
 function get_profile() {
+    trap 'stty -f /dev/tty echo' EXIT
     stty -f /dev/tty -echo
     exec 9<> /dev/tty
     print_osc >&9
@@ -152,7 +154,7 @@ case "$1" in
             show_help
             exit 1
         }
-        set_profile "${ITERM_PROFILE:-Default}"
+        set_profile "${ITERM_PROFILE:-}"
         ;;
     *)
         error "Unknown option: $1"
