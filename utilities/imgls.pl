@@ -45,7 +45,7 @@ binmode STDERR, ':encoding(UTF-8)';
 my $prog = basename $0;
 sub usage {
     my $leader = "usage: $prog";
-    say 
+    say STDERR
         "usage: $prog",
         " [--width #] [--height #] [--[no]preserve_ratio] [--[no]dimensions]",
         "\n",
@@ -98,7 +98,7 @@ if (@ARGV <= 1) {
 my (@files, @dirs);
 for (@ARGV) {
     if (! -e _lstat($_)) {
-        say "$prog: $_: No such file or directory";
+        say STDERR "$prog: $_: No such file or directory";
     }
     elsif (-f _lstat($_)) {
         push @files, $_;
@@ -120,7 +120,7 @@ while (@dirs) {
     my $path = shift @dirs;
 
     if (! -e $path) {
-        say "$prog: $path: No such file or directory";
+        say STDERR "$prog: $path: No such file or directory";
         next;
     }
     my (@f, @d);
@@ -136,7 +136,6 @@ while (@dirs) {
 # Encodes and outputs an image file to the window
 #    arg 1: path to an image file
 #    arg 2: size, in bytes, of the image
-# Image data is written to STDERR so filters on STDOUT work as expected.
 sub write_image {
     my ($file, $size) = @_;
     my $encoded;
@@ -154,7 +153,7 @@ sub write_image {
         $imgparams{'size'} = $one_pixel_black_len;
     }
 
-    printf STDERR "%s%s%s;File=%s:%s%s",
+    printf "%s%s%s;File=%s:%s%s",
             "\033", "]", "1337",                                                # image leadin sequence (OSC + 1337)
             join(';', map { $_ . '=' . $imgparams{$_} } keys %imgparams),       # semicolon separated pairs of param=value pairs
             $encoded,                                                           # base64 encoded image bytes
@@ -190,7 +189,7 @@ sub get_dir_content {
     my $dh;
 
     unless (opendir($dh, $path)) {
-        say "Unable to open directory $path: $!";
+        say STDERR "Unable to open directory $path: $!";
         return undef;
     }
 
@@ -257,8 +256,6 @@ sub do_ls {
 
     for my $h (@hfiles) {
         if (! -f $h->{'st'} or ! $h->{'bytes'} or ($opts{'dimensions'} and ! $h->{'dims'} and ! $opts{'unknown'})) {
-            # may not produce correct num of dashes: --pre --h 3 --w 10
-            #printf "%s", '-' x ($imgparams{'width'} =~ /^\d+$/ ? $imgparams{'width'} : $def_image_width);
             # pass a ref to indicate the data is already base64 encoded
             write_image \$one_pixel_black, $one_pixel_black_len;
         }
@@ -386,7 +383,7 @@ sub find_dims_methods {
         }
     }
 
-    say "$prog: no methods found to obtain image dimensions. Tried: ",
+    say STDERR "$prog: no methods found to obtain image dimensions. Tried: ",
         map { "\n   " . (exists $_->{'name'} ? $_->{'name'} : $_->{'prog'}) } @$methods;
 
     exit 1;
