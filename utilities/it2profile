@@ -93,20 +93,24 @@ function check_dependency() {
 # get currently active profile name.
 #
 function get_profile() {
-    trap 'stty -f /dev/tty echo' EXIT
-    stty -f /dev/tty -echo
+    trap 'cleanup' EXIT
+    stty -f /dev/tty -echo 2&> /dev/null || stty -F /dev/tty -echo
     exec 9<> /dev/tty
     print_osc >&9
     printf "1337;ReportVariable=cHJvZmlsZU5hbWU=" >&9
     print_st >&9
     read -r -t 5 -d $'\a' iterm_response <&9
     exec 9>&-
-    stty -f /dev/tty echo
+    stty -f /dev/tty -echo 2&> /dev/null || stty -F /dev/tty -echo
     [[ "$iterm_response" =~ ReportVariable= ]] || {
         error "Failed to read response from iTerm2"
         exit 2
     }
     echo "$(b64_decode <<< ${iterm_response#*=})"
+}
+
+function cleanup() {
+    stty -f /dev/tty echo 2&> /dev/null || stty -F /dev/tty echo
 }
 
 function set_profile() {
