@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o pipefail
+
 # tmux requires unrecognized OSC sequences to be wrapped with DCS tmux;
 # <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
 # only accepts ESC backslash for ST. We use TERM instead of TMUX because TERM
@@ -50,42 +52,84 @@ function b64_decode() {
     base64 $BASE64ARG
 }
 
-# print_image filename inline base64contents print_filename
+# print_image filename inline base64contents print_filename width height preserve_aspect_ratio
 #   filename: Filename to convey to client
-#   inline: 0 or 1
+#   inline: 0 or 1, if set to 1, the file will be displayed inline, otherwise, it will be downloaded
 #   base64contents: Base64-encoded contents
-#   print_filename: If non-empty, print the filename
-#                   before outputting the image
+#   print_filename: 0 or 1, if set to 1, print the filename after outputting the image
+#   width: set output width of the image in character cells, pixels or percent
+#   height: set output height of the image in character cells, pixels or percent
+#   preserve_aspect_ratio: 0 or 1, if set to 1, fill the specified width and height as much as possible without stretching the image
 function print_image() {
     print_osc
-    printf '1337;File='
-    if [[ -n $1 ]]; then
-        printf "name=%s;" "$(printf "%s" "$1" | b64_encode)"
-    fi
-
-    printf "%s" "$3" | b64_decode | wc -c | awk '{printf "size=%d",$1}'
-    printf ";inline=%s" "$2"
-    printf ":"
-    printf "%s" "$3"
+    printf "1337;File=inline=%s" "$2"
+    printf ";size=%d" $(printf "%s" "$3" | b64_decode | wc -c)
+    [ -n "$1" ] && printf ";name=%s" "$(printf "%s" "$1" | b64_encode)"
+    [ -n "$5" ] && printf ";width=%s" "$5"
+    [ -n "$6" ] && printf ";height=%s" "$6"
+    [ -n "$7" ] && printf ";preserveAspectRatio=%s" "$7"
+    printf ":%s" "$3"
     print_st
     printf '\n'
-    if [[ -n $4 ]]; then
-        echo "$1"
-    fi
+    [ "$4" == "1" ] && echo "$1"
+    has_image_displayed=t
 }
 
 function error() {
-    echo "ERROR: $*" 1>&2
+    errcho "ERROR: $*"
+}
+
+function errcho() {
+    echo "$@" >&2
 }
 
 function show_help() {
-    echo "Usage: imgcat [-p] filename ..." 1>&2
-    echo "   or: cat filename | imgcat" 1>&2
+    errcho
+    errcho "Usage: imgcat [-p] [-n] [-W width] [-H height] [-r] [-s] [-u] [-f] filename ..."
+    errcho "       cat filename | imgcat [-W width] [-H height] [-r] [-s]"
+    errcho
+    errcho "Display images inline in the iTerm2 using Inline Images Protocol"
+    errcho
+    errcho "Options:"
+    errcho
+    errcho "    -h, --help                      Display help message"
+    errcho "    -p, --print                     Enable printing of filename or URL after each image"
+    errcho "    -n, --no-print                  Disable printing of filename or URL after each image"
+    errcho "    -u, --url                       Interpret following filename arguments as remote URLs"
+    errcho "    -f, --file                      Interpret following filename arguments as regular Files"
+    errcho "    -r, --preserve-aspect-ratio     When scaling image preserve its original aspect ratio"
+    errcho "    -s, --stretch                   Stretch image to specified width and height (this option is opposite to -r)"
+    errcho "    -W, --width N                   Set image width to N character cells, pixels or percent (see below)"
+    errcho "    -H, --height N                  Set image height to N character cells, pixels or percent (see below)"
+    errcho
+    errcho "    If you don't specify width or height an appropriate value will be chosen automatically."
+    errcho "    The width and height are given as word 'auto' or number N followed by a unit:"
+    errcho "        N      character cells"
+    errcho "        Npx    pixels"
+    errcho "        N%     percent of the session's width or height"
+    errcho "        auto   the image's inherent size will be used to determine an appropriate dimension"
+    errcho
+    errcho "Examples:"
+    errcho
+    errcho "    $ imgcat -W 250px -H 250px -s avatar.png"
+    errcho "    $ cat graph.png | imgcat -W 100%"
+    errcho "    $ imgcat -p -W 500px -u http://host.tld/path/to/image.jpg -W 80 -f image.png"
+    errcho "    $ cat url_list.txt | xargs imgcat -p -W 40 -u"
+    errcho
 }
 
 function check_dependency() {
     if ! (builtin command -V "$1" >/dev/null 2>&1); then
         echo "imgcat: missing dependency: can't find $1" 1>&2
+        exit 1
+    fi
+}
+
+# verify that value is in the image sizing unit format: N / Npx / N% / auto
+function validate_size_unit() {
+    if [[ ! "$1" =~ ^(:?[0-9]+(:?px|%)?|auto)$ ]]; then
+        error "Invalid image sizing unit - '$1'"
+        show_help
         exit 1
     fi
 }
@@ -104,7 +148,6 @@ if [ $has_stdin = f ] && [ $# -eq 0 ]; then
     exit
 fi
 
-check_dependency awk
 check_dependency base64
 check_dependency wc
 
@@ -118,18 +161,33 @@ while [ $# -gt 0 ]; do
     -p | --p | --print)
         print_filename=1
         ;;
+    -n | --n | --no-print)
+        print_filename=0
+        ;;
+    -W | --W | --width)
+        validate_size_unit "$2"
+        width="$2"
+        shift
+        ;;
+    -H | --H | --height)
+        validate_size_unit "$2"
+        height="$2"
+        shift
+        ;;
+    -r | --R | --preserve-aspect-ratio)
+        preserve_aspect_ratio=1
+        ;;
+    -s | --S | --stretch)
+        preserve_aspect_ratio=0
+        ;;
+    -f | --F | --file)
+        has_stdin=f
+        is_url=f
+        ;;
     -u | --u | --url)
         check_dependency curl
-        encoded_image=$(curl -s "$2" | b64_encode) || (
-            error "No such file or url $2"
-            exit 2
-        )
         has_stdin=f
-        print_image "$2" 1 "$encoded_image" "$print_filename"
-        set -- "${@:1:1}" "-u" "${@:3}"
-        if [ "$#" -eq 2 ]; then
-            exit
-        fi
+        is_url=t
         ;;
     -*)
         error "Unknown option flag: $1"
@@ -137,13 +195,19 @@ while [ $# -gt 0 ]; do
         exit 1
         ;;
     *)
-        if [ -r "$1" ]; then
-            has_stdin=f
-            print_image "$1" 1 "$(b64_encode <"$1")" "$print_filename"
+        if [ "$is_url" == "t" ]; then
+            encoded_image=$(curl -fs "$1" | b64_encode) || {
+                error "Could not retrieve image from URL $1, error_code: $?"
+                exit 2
+            }
+        elif [ -r "$1" ]; then
+            encoded_image=$(cat "$1" | b64_encode)
         else
             error "imgcat: $1: No such file or directory"
             exit 2
         fi
+        has_stdin=f
+        print_image "$1" 1 "$encoded_image" "$print_filename" "$width" "$height" "$preserve_aspect_ratio"
         ;;
     esac
     shift
@@ -151,7 +215,13 @@ done
 
 # Read and print stdin
 if [ $has_stdin = t ]; then
-    print_image "" 1 "$(cat | b64_encode)" ""
+    print_image "" 1 "$(cat | b64_encode)" 0 "$width" "$height" "$preserve_aspect_ratio"
+fi
+
+if [ "$has_image_displayed" != "t" ]; then
+    error "No image provided. Check command line options."
+    show_help
+    exit 1
 fi
 
 exit 0
