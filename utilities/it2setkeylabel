@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # tmux requires unrecognized OSC sequences to be wrapped with DCS tmux;
 # <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
@@ -32,7 +32,7 @@ function show_help() {
     echo "     If name is given, all key labels up to and including the one with the matching name are popped." 1>& 2
     echo "" 1>& 2
     echo "Example:" 1>& 2
-    echo "#!/bin/bash" 1>& 2
+    echo "#!/usr/bin/env bash" 1>& 2
     echo "# Wrapper script for mc that sets function key labels" 1>& 2
     echo "NAME=mc_\$RANDOM" 1>& 2
     echo "# Save existing labels" 1>& 2

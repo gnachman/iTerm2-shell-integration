@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 open=0
 
 # tmux requires unrecognized OSC sequences to be wrapped with DCS tmux;

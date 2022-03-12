@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 trap clean_up EXIT
 _STTY=$(stty -g)      ## Save current terminal setup
