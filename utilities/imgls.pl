@@ -28,13 +28,15 @@ use utf8;
 use warnings;
 
 use File::stat;
+use IO::Select;
+use IPC::Open3;
 use File::Which;
 use MIME::Base64;
 use File::Basename;
+use Symbol 'gensym';
 use Encode qw(decode);
 use List::Util qw(max);
 use POSIX qw(strftime floor modf);
-use Capture::Tiny ':all';
 use Getopt::Long qw(:config no_permute pass_through require_order);
 
 STDERR->autoflush(1);
@@ -305,9 +307,7 @@ sub get_dimensions {
             $ret = $dims_method->{'format'}->($file);
         }
         else {
-            my ($stdout, $stderr, $exit) = capture {
-                system($dims_method->{'prog'}, @{$dims_method->{'args'}}, $file);
-            };
+            my ($stdout, $stderr, $exit) = runcmd($dims_method->{'prog'}, @{$dims_method->{'args'}}, $file);
             if ($stdout) {
                 $ret = $dims_method->{'format'}->($stdout);
             }
@@ -316,6 +316,39 @@ sub get_dimensions {
 
     $failed_types{$ext}++       if ! $ret and $ext;
     return $ret;
+}
+
+sub runcmd {
+    my $prog = shift;
+
+    my $pid = open3(my $in, my $out, my $err = gensym, $prog, @_);
+
+    my ($out_buf, $err_buf) = ('', '');
+    my $select = new IO::Select;
+    $select->add($out, $err);
+    while (my @ready = $select->can_read(5)) {
+        foreach my $fh (@ready) {
+            my $data;
+            my $bytes = sysread($fh, $data, 1024);
+            if (! defined( $bytes) && ! $!{ECONNRESET}) {
+                die "error running cmd: $prog: $!";
+            }
+            elsif (! defined $bytes or $bytes == 0) {
+                $select->remove($fh);
+                next;
+            }
+            else {
+                if    ($fh == $out) { $out_buf .= $data; }
+                elsif ($fh == $err) { $err_buf .= $data; }
+                else {
+                    die 'unexpected filehandle in runcmd';
+                }
+            }
+        }
+    }
+
+    waitpid($pid, 0);
+    return ($out_buf, $err_buf, $? >> 8);
 }
 
 # List of methods to obtain image dimensions, tried in prioritized order.
@@ -331,6 +364,7 @@ sub init_dims_methods {
                 return ($out =~ /pixelWidth: (\d+)\s+pixelHeight: (\d+)/s) ? { width => $1, height => $2 } : undef;
             }
         },
+
         {
             prog        => 'mdls',
             args        => [ '-name', 'kMDItemPixelWidth', '-name', 'kMDItemPixelHeight' ],
@@ -354,6 +388,16 @@ sub init_dims_methods {
                 return { width => $d[0], height => $d[1] };
             }
         },
+
+        {
+            prog        => 'exiftool',
+            args        => [ '-s', '-ImageSize' ],
+            format      => sub {
+                my $out = shift;
+                return ($out =~ /ImageSize\s+:\s+(\d+)x(\d+)/) ? { width => $1, height => $2 } : undef;
+            }
+        },
+
         # Use Image::Size last, due to limitations mentioned elsewhere
         {
             prog        => \&have_Image_Size,
