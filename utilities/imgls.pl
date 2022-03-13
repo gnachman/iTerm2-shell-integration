@@ -30,7 +30,7 @@ use warnings;
 use File::stat;
 use IO::Select;
 use IPC::Open3;
-use File::Which;
+use File::Spec;
 use MIME::Base64;
 use File::Basename;
 use Symbol 'gensym';
@@ -559,6 +559,27 @@ sub _lstat {
 
     return $file;
 }
+
+sub which {
+  my ($exec) = @_;
+
+    $exec or
+        return undef;
+
+    if ($exec =~ m#/# && -f $exec && -x _) {
+        return $exec
+    }
+
+    foreach my $file ( map { File::Spec->catfile($_, $exec) } File::Spec->path) {
+        -d $file and
+            next;
+        -x _ and
+            return $file;
+    }
+
+    return undef;
+}
+
 
 # Generate 1 pixel black PNG as placeholding for non-image-able files.
 sub get_black_pixel_image {
