@@ -1,0 +1,86 @@
+#!/bin/bash
+# The iTerm2 customizations fall under the following license:
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+# -- BEGIN ITERM2 CUSTOMIZATIONS --
+if [[ "$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX""$TERM" != screen && "$ITERM_SHELL_INTEGRATION_INSTALLED" = "" && "$-" == *i* && "$TERM" != linux && "$TERM" != dumb ]]; then
+
+if shopt extdebug | grep on > /dev/null; then
+  echo "iTerm2 Shell Integration not installed."
+  echo ""
+  echo "Your shell has 'extdebug' turned on."
+  echo "This is incompatible with shell integration."
+  echo "Find 'shopt -s extdebug' in bash's rc scripts and remove it."
+  return 0
+fi
+
+ITERM_SHELL_INTEGRATION_INSTALLED=Yes
+# Saved copy of your PS1. This is used to detect if the user changes PS1
+# directly. ITERM_PREV_PS1 will hold the last value that this script set PS1 to
+# (including various custom escape sequences).
+ITERM_PREV_PS1="$PS1"
+
+# A note on execution. When you invoke a command at an interactive prompt the following steps are taken:
+#
+# 1. The DEBUG trap runs.
+#   It calls __bp_preexec_invoke_exec
+#     It runs any registered preexec_functions, including __iterm2_preexec
+# 2. The command you executed runs.
+# 3. PROMPT_COMMAND runs.
+#   It runs __bp_precmd_invoke_cmd, which is inserted as the first command in PROMPT_COMMAND.
+#     It calls any registered precmd_functions
+#   Then, pre-existing PROMPT_COMMANDs run
+# 4. The prompt is shown.
+#
+# __iterm2_prompt_command used to be run from precmd_functions but then a pre-existing
+# PROMPT_COMMAND could clobber the PS1 it modifies. Instead, add __iterm2_prompt_command as the last
+# of the "preexisting" PROMPT_COMMANDs so it will be the very last thing done before the prompt is
+# shown (unless someone amends PROMPT_COMMAND, but that is on them).
+if [[ -n "$PROMPT_COMMAND" ]]; then
+    PROMPT_COMMAND+=$'\n'
+fi;
+PROMPT_COMMAND+='__iterm2_prompt_command'
+
+# The following chunk of code, bash-preexec.sh, is licensed like this:
+# The MIT License
+#
+# Copyright (c) 2015 Ryan Caloras and contributors (see https://github.com/rcaloras/bash-preexec)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+# Wrap bash-preexec.sh in a function so that, if it exits early due to having
+# been sourced elsewhere, it doesn't exit our entire script.
+_install_bash_preexec () {
+# -- END ITERM2 CUSTOMIZATIONS --
+
+# -- BEGIN BASH-PREEXEC.SH --
