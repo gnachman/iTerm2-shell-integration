@@ -60,6 +60,7 @@ function b64_decode() {
 #   width: set output width of the image in character cells, pixels or percent
 #   height: set output height of the image in character cells, pixels or percent
 #   preserve_aspect_ratio: 0 or 1, if set to 1, fill the specified width and height as much as possible without stretching the image
+#   mime_type: Empty string or mime type like "application/json".
 function print_image() {
     print_osc
     printf "1337;File=inline=%s" "$2"
@@ -68,6 +69,7 @@ function print_image() {
     [ -n "$5" ] && printf ";width=%s" "$5"
     [ -n "$6" ] && printf ";height=%s" "$6"
     [ -n "$7" ] && printf ";preserveAspectRatio=%s" "$7"
+    [ -n "$8" ] && printf ";type=%s" "$8"
     printf ":%s" "$3"
     print_st
     printf '\n'
@@ -85,7 +87,7 @@ function errcho() {
 
 function show_help() {
     errcho
-    errcho "Usage: imgcat [-p] [-n] [-W width] [-H height] [-r] [-s] [-u] [-f] filename ..."
+    errcho "Usage: imgcat [-p] [-n] [-W width] [-H height] [-r] [-s] [-u] [-t mime-type] [-f] filename ..."
     errcho "       cat filename | imgcat [-W width] [-H height] [-r] [-s]"
     errcho
     errcho "Display images inline in the iTerm2 using Inline Images Protocol"
@@ -97,6 +99,7 @@ function show_help() {
     errcho "    -n, --no-print                  Disable printing of filename or URL after each image"
     errcho "    -u, --url                       Interpret following filename arguments as remote URLs"
     errcho "    -f, --file                      Interpret following filename arguments as regular Files"
+    errcho "    -t, --type mime-type            Provides a mime-type hint."
     errcho "    -r, --preserve-aspect-ratio     When scaling image preserve its original aspect ratio"
     errcho "    -s, --stretch                   Stretch image to specified width and height (this option is opposite to -r)"
     errcho "    -W, --width N                   Set image width to N character cells, pixels or percent (see below)"
@@ -109,12 +112,16 @@ function show_help() {
     errcho "        N%     percent of the session's width or height"
     errcho "        auto   the image's inherent size will be used to determine an appropriate dimension"
     errcho
+    errcho "    If a mime type is provided, it is used as a hint to disambiguate."
+    errcho "    For example, use -t application/json -t text/markdown to render pretty-printed text documents (iTerm2 3.5.0beta7 and later)."
+    errcho
     errcho "Examples:"
     errcho
     errcho "    $ imgcat -W 250px -H 250px -s avatar.png"
     errcho "    $ cat graph.png | imgcat -W 100%"
     errcho "    $ imgcat -p -W 500px -u http://host.tld/path/to/image.jpg -W 80 -f image.png"
     errcho "    $ cat url_list.txt | xargs imgcat -p -W 40 -u"
+    errcho "    $ imgcat -t application/json config.json"
     errcho
 }
 
@@ -150,6 +157,7 @@ fi
 
 check_dependency base64
 check_dependency wc
+mime_type=""
 
 # Look for command line flags.
 while [ $# -gt 0 ]; do
@@ -189,6 +197,10 @@ while [ $# -gt 0 ]; do
         has_stdin=f
         is_url=t
         ;;
+    -t | --t | --type)
+         mime_type="$2"
+         shift
+         ;;
     -*)
         error "Unknown option flag: $1"
         show_help
@@ -207,7 +219,7 @@ while [ $# -gt 0 ]; do
             exit 2
         fi
         has_stdin=f
-        print_image "$1" 1 "$encoded_image" "$print_filename" "$width" "$height" "$preserve_aspect_ratio"
+        print_image "$1" 1 "$encoded_image" "$print_filename" "$width" "$height" "$preserve_aspect_ratio" "$mime_type"
         ;;
     esac
     shift
