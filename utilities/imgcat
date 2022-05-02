@@ -99,7 +99,7 @@ function show_help() {
     errcho "    -n, --no-print                  Disable printing of filename or URL after each image"
     errcho "    -u, --url                       Interpret following filename arguments as remote URLs"
     errcho "    -f, --file                      Interpret following filename arguments as regular Files"
-    errcho "    -t, --type file-type            Provides a type hint."
+    errcho "    -t, --type file-type            Provides a type hint"
     errcho "    -r, --preserve-aspect-ratio     When scaling image preserve its original aspect ratio"
     errcho "    -s, --stretch                   Stretch image to specified width and height (this option is opposite to -r)"
     errcho "    -W, --width N                   Set image width to N character cells, pixels or percent (see below)"
@@ -129,7 +129,7 @@ function show_help() {
 
 function check_dependency() {
     if ! (builtin command -V "$1" >/dev/null 2>&1); then
-        echo "imgcat: missing dependency: can't find $1" 1>&2
+        error "missing dependency: can't find $1"
         exit 1
     fi
 }
@@ -184,13 +184,13 @@ while [ $# -gt 0 ]; do
         height="$2"
         shift
         ;;
-    -r | --R | --preserve-aspect-ratio)
+    -r | --r | --preserve-aspect-ratio)
         preserve_aspect_ratio=1
         ;;
-    -s | --S | --stretch)
+    -s | --s | --stretch)
         preserve_aspect_ratio=0
         ;;
-    -f | --F | --file)
+    -f | --f | --file)
         has_stdin=f
         is_url=f
         ;;
