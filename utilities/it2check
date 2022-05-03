@@ -43,21 +43,14 @@ function clean_up() {
   stty "$_STTY"            ## Restore terminal settings
 }
 
-# Consume any pending input on stdin, which would otherwise be accidentally
-# consumed by `read_dsr`, which would attempt and fail to parse it as DSR
-# version information.
-# For `iTerm.app`, this results in `it2check` incorrectly returning false.
-# For e.g. `Terminal.app`, this makes `it2check` hang (until an `n` is entered).
-# TODO: Ideally, we would be able to capture the DSR response without destroying
-# the existing pending input. However, simple workarounds (such as executing
-# `$(it2check)` in a subshell) don't work (because the DSR response is not
-# generated from a subshell).
-stty -echo -icanon raw min 0 time 0  # Prepare to silently read any (>=0) characters with no timeout.
-while read none; do :; done  # Consume all pending input (on stdin).
-clean_up  # Reset the TTY, so it behaves as expected for the rest of the it2check script.
-# NOTE: Any future input at the terminal before `read_dsr` causes `it2check` to fail.
-# For example, uncomment the following line and enter characters to see it fail.
-# echo "Enter any non-DSR characters in the next two seconds..."; sleep 2
+# Prepare to silently read any (>=0) characters with no timeout.
+stty -echo -icanon raw min 0 time 0
+
+# Consume all pending input.
+while read none; do :; done
+
+# Reset the TTY, so it behaves as expected for the rest of the it2check script.
+clean_up 
 
 # Enter raw mode and turn off echo so the terminal and I can chat quietly.
 stty -echo -icanon raw
