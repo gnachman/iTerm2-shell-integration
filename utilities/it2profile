@@ -94,14 +94,14 @@ function check_dependency() {
 #
 function get_profile() {
     trap 'cleanup' EXIT
-    stty -f /dev/tty -echo 2&> /dev/null || stty -F /dev/tty -echo
+    stty -echo < /dev/tty
     exec 9<> /dev/tty
     print_osc >&9
     printf "1337;ReportVariable=cHJvZmlsZU5hbWU=" >&9
     print_st >&9
     read -r -t 5 -d $'\a' iterm_response <&9
     exec 9>&-
-    stty -f /dev/tty -echo 2&> /dev/null || stty -F /dev/tty -echo
+    stty echo < /dev/tty
     [[ "$iterm_response" =~ ReportVariable= ]] || {
         error "Failed to read response from iTerm2"
         exit 2
@@ -110,7 +110,7 @@ function get_profile() {
 }
 
 function cleanup() {
-    stty -f /dev/tty echo 2&> /dev/null || stty -F /dev/tty echo
+    stty echo < /dev/tty
 }
 
 function set_profile() {
@@ -164,7 +164,7 @@ case "$1" in
         error "Unknown option: $1"
         show_help
         exit 1
-      ;;
+        ;;
 esac
 
 exit 0
