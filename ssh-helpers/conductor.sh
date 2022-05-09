@@ -10,13 +10,14 @@ shell_name=""
 quit=0
 python_detected="0"
 perl_detected="0"
+exec_shell=0
+stty_settings=$(command stty -g)
 
 # Utilities
 ################################################################################
 
 cleanup() {
-    log cleanup
-    command stty "echo" 2> /dev/null < /dev/tty
+  command stty "$stty_settings"
 }
 
 die() {
@@ -38,28 +39,13 @@ log() {
 # Printing control sequences
 ################################################################################
 
-print_osc() {
-    if [[ $TERM == screen* ]]; then
-        printf "\033Ptmux;\033\033]"
-    else
-        printf "\033]"
-    fi
-}
+print_dcs() {
+    local token=$1
+    local sshargs=$2
+    log osc print_dcs $1 $2
 
-print_st() {
-    if [[ $TERM == screen* ]]; then
-        printf "\a\033\\"
-    else
-        printf "\a"
-    fi
-}
-
-print_1337() {
-    log osc 1337 $1
-
-    print_osc
-    printf "1337;%s" "$1"
-    print_st
+    printf "\033P2000p"
+    printf "%s %s\n" "${token}" "${sshargs}"
 }
 
 # String parsing
@@ -219,6 +205,10 @@ exec_login_shell() {
 # Figure out the user's login shell and run it.
 conductor_cmd_exec_login_shell() {
     log conductor_cmd_exec_login_shell
+    exec_shell=1
+}
+
+really_exec_login_shell() {
     exec_login_shell $(guess_login_shell)
 }
 
@@ -304,9 +294,14 @@ handle_command() {
         echo "bad command ${cmd_name}"
         false
     fi
-    echo end $? $boundary
+    echo end $boundary $?
     if [[ $quit == 1 ]]; then
         exit 0
+    fi
+    if [[ $exec_shell == 1 ]]; then
+        echo unhook
+        cleanup
+        really_exec_login_shell
     fi
     set -e
 }
@@ -321,10 +316,13 @@ iterate() {
 
 main() {
     local token=$1
+    local sshargs=$(printf %s "$2" | base64_decode)
 
     log starting with token $token
 
-    print_1337 "Conduct=start;token=$(printf "%s" "$token" | base64_encode)"
+    trap "cleanup" EXIT
+    command stty "-echo" < /dev/tty
+    print_dcs "$token" "$sshargs"
 
     log begin mainloop
 
