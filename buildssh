@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cat ssh-helpers/it2ssh | sed -e "s;B64CONDUCTOR;$(cat ssh-helpers/conductor.sh | ./bash-minify | base64);" > utilities/it2ssh
+
