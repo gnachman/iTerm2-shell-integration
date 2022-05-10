@@ -7,6 +7,23 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
+function print_osc() {
+    if [[ $TERM == screen* ]]; then
+        printf "\033Ptmux;\033\033]"
+    else
+        printf "\033]"
+    fi
+}
+
+# More of the tmux workaround described above.
+function print_st() {
+    if [[ $TERM == screen* ]]; then
+        printf "\a\033\\"
+    else
+        printf "\a"
+    fi
+}
+
 mkdir -p ~/.ssh/controlmasters
 CONTROL_PATH="$HOME/.ssh/controlmasters/%r@%h:%p"
 
@@ -41,6 +58,11 @@ if [ ! -d ~/.ssh ]; then
     mkdir ~/.ssh
     chmod 700 ~/.ssh
 fi
+
+print_osc
+printf "1337;Env=report=all:"
+command env | base64_encode
+print_st
 
 SSHARGS=$(printf %s "$*" | base64_encode)
 
