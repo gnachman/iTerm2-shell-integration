@@ -237,8 +237,8 @@ conductor_cmd_write() {
     log conductor_cmd_write
 
     local b64data=$1
-    # Expand ~ to home dir
-    local destination=${2/#\~/$HOME}
+    # Use eval to expand $HOME
+    local destination=$(eval printf %s "$2")
 
     log writing to $destination based on $2
 
@@ -247,8 +247,10 @@ conductor_cmd_write() {
     # suppress STDERR for tar as tar prints various warnings if for instance, timestamps are in the future
     old_umask=$(umask)
     umask 000
-    printf "%s" ${b64data} | base64_decode | command tar "xpzf" "-" "-C" "$destination" 2> /dev/null
+    printf "%s" ${b64data} | base64_decode | command tar "xpzf" "-" "-C" "$destination"
+    local rc=$?
     umask "$old_umask"
+    (exit $rc)
 }
 
 conductor_cmd_cd() {
@@ -288,6 +290,7 @@ handle_command() {
     echo begin $boundary
     log invoke $cmd_name with arguments $args
     set +e
+    set +o pipefail
     if [[ $(type -t conductor_cmd_${cmd_name}) == function ]]; then
         conductor_cmd_${cmd_name} $args
     else
@@ -304,6 +307,7 @@ handle_command() {
         really_exec_login_shell
     fi
     set -e
+    set -o pipefail
 }
 
 iterate() {

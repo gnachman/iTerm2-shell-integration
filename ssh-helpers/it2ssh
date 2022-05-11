@@ -66,6 +66,8 @@ print_st
 
 SSHARGS=$(printf %s "$*" | base64_encode)
 
+# Here we do /usr/bin/env sh rather than exec sh to avoid adding this command
+# to the login shell's history.
 $SSH \
 -t \
 -o \
@@ -82,7 +84,7 @@ ServerAliveCountMax=5 \
 TCPKeepAlive=no \
 -- \
 $1 \
-exec \
+/usr/bin/env \
 sh \
 -c \
 "$eval_cmd" \
