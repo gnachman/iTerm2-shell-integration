@@ -65,6 +65,7 @@ command env | base64_encode
 print_st
 
 SSHARGS=$(printf %s "$*" | base64_encode)
+UNIQUEID=${RANDOM}${RANDOM}
 
 # Here we do /usr/bin/env sh rather than exec sh to avoid adding this command
 # to the login shell's history.
@@ -88,5 +89,9 @@ $1 \
 sh \
 -c \
 "$eval_cmd" \
-\'"$sanitized main $TOKEN $SSHARGS"\'
+\'"$sanitized main $TOKEN ${UNIQUEID} $SSHARGS"\'
+
+print_osc
+printf "1337;EndSSH=%s" "${UNIQUEID}"
+print_st
 

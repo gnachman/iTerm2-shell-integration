@@ -41,11 +41,12 @@ log() {
 
 print_dcs() {
     local token=$1
-    local sshargs=$2
-    log osc print_dcs $1 $2
+    local uniqueid=$2
+    local sshargs=$3
+    log osc print_dcs $1 $2 $3
 
     printf "\033P2000p"
-    printf "%s %s\n" "${token}" "${sshargs}"
+    printf "%s %s - %s\n" "${token}" "${uniqueid}" "${sshargs}"
 }
 
 # String parsing
@@ -318,15 +319,29 @@ iterate() {
     handle_command "$line"
 }
 
+drain_stdin() {
+  stty -echo -icanon time 0 min 0
+  while :
+  do
+      key="$(echo -n x; dd bs=1 count=1 2> /dev/null; echo -n x)"
+      if [[ "$key" == "xx" ]]; then
+          break
+      fi
+  done
+  cleanup
+}
+
 main() {
     local token=$1
-    local sshargs=$(printf %s "$2" | base64_decode)
+    local uniqueid=$2
+    local sshargs=$(printf %s "$3" | base64_decode)
 
     log starting with token $token
 
     trap "cleanup" EXIT
+    drain_stdin
     command stty "-echo" < /dev/tty
-    print_dcs "$token" "$sshargs"
+    print_dcs "$token" "$uniqueid" "$sshargs"
 
     log begin mainloop
 
