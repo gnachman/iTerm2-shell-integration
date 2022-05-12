@@ -339,9 +339,9 @@ main() {
     log starting with token $token
 
     trap "cleanup" EXIT
+    print_dcs "$token" "$uniqueid" "$sshargs"
     drain_stdin
     command stty "-echo" < /dev/tty
-    print_dcs "$token" "$uniqueid" "$sshargs"
 
     log begin mainloop
 
