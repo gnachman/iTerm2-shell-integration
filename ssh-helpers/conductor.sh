@@ -11,6 +11,7 @@ quit=0
 python_detected="0"
 perl_detected="0"
 exec_shell=0
+run_cmd=0
 stty_settings=$(command stty -g)
 
 # Utilities
@@ -42,11 +43,12 @@ log() {
 print_dcs() {
     local token=$1
     local uniqueid=$2
-    local sshargs=$3
-    log osc print_dcs $1 $2 $3
+    local boolargs=$3
+    local sshargs=$4
+    log osc print_dcs $1 $2 $3 $4
 
     printf "\033P2000p"
-    printf "%s %s - %s\n" "${token}" "${uniqueid}" "${sshargs}"
+    printf "%s %s %s - %s\n" "${token}" "${uniqueid}" "${boolargs}" "${sshargs}"
 }
 
 # String parsing
@@ -229,8 +231,13 @@ conductor_cmd_setenv() {
 }
 
 conductor_cmd_run() {
-    log conductor_cmd_run $*
-    $*
+    log conductor_cmd_run
+    run_cmd=1
+}
+
+really_run() {
+    log really_run $*
+    exec $*
 }
 
 # Untar a base64-encoded file at a specified location.
@@ -307,6 +314,11 @@ handle_command() {
         cleanup
         really_exec_login_shell
     fi
+    if [[ $run_cmd == 1 ]]; then
+        echo unhook
+        cleanup
+        really_run $args
+    fi
     set -e
     set -o pipefail
 }
@@ -320,27 +332,31 @@ iterate() {
 }
 
 drain_stdin() {
+  log drain_stdin
   stty -echo -icanon time 0 min 0
   while :
   do
-      key="$(echo -n x; dd bs=1 count=1 2> /dev/null; echo -n x)"
+      key="$(printf x; dd bs=1 count=1 2> /dev/null; printf x)"
       if [[ "$key" == "xx" ]]; then
+          log "done draining"
           break
       fi
+      log "$key"
   done
   cleanup
 }
 
 main() {
-    local token=$1
-    local uniqueid=$2
-    local sshargs=$(printf %s "$3" | base64_decode)
+    local token="$1"
+    local uniqueid="$2"
+    local booleanargs="$3"
+    local sshargs="$4"
 
     log starting with token $token
 
     trap "cleanup" EXIT
-    print_dcs "$token" "$uniqueid" "$sshargs"
     drain_stdin
+    print_dcs "$token" "$uniqueid" "$booleanargs" "$sshargs"
     command stty "-echo" < /dev/tty
 
     log begin mainloop

@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-    echo "usage: it2ssh hostname" 1>&2
+if [ "$#" -eq 0 ]; then
+    ssh 2>&1 | sed -e 's/usage: ssh/usage: it2ssh/' >&2
     exit 1
 fi
 
@@ -67,29 +67,72 @@ print_st
 SSHARGS=$(printf %s "$*" | base64_encode)
 UNIQUEID=${RANDOM}${RANDOM}
 
+USER_ARGS=()
+HOSTNAME=""
+COMMAND=()
+ARGS_ALLOWED=1
+EXPECT_VALUE=0
+BOOLEAN_ARGS=$(ssh 2>&1 | tr -d '\n' | sed -e 's/^[^[]*\[-*\([a-z0-9A-Z]*\).*/\1/' || true)
+HAS_T=0
+
+while [[ $# -gt 0 ]]; do
+    if [[ $EXPECT_VALUE == 1 ]]; then
+        USER_ARGS+=("$1")
+        EXPECT_VALUE=0
+    elif [[ $ARGS_ALLOWED == 0 ]]; then
+        if [[ $HOSTNAME == "" ]]; then
+            HOSTNAME="$1"
+        else
+            COMMAND+=("$1")
+        fi
+    else
+        case $1 in
+            -N|-n|-f|-G)
+                echo "it2sh is meant for interactive use via SSH only and is not compatible with the $1 argument."
+                exit 1
+                ;;
+            -t)
+                HAS_T=1
+                USER_ARGS+=("-t")
+                ;;
+            -*)
+                LETTER="${1:1}"
+                if (printf %s "$BOOLEAN_ARGS" | grep "$LETTER"  > /dev/null 2>&1)
+                then
+                    EXPECT_VALUE=0
+                else
+                    EXPECT_VALUE=1
+                fi
+                USER_ARGS+=("$1")
+                ;;
+            --)
+                ARGS_ALLOWED=0
+                ;;
+            *)
+                ARGS_ALLOWED=0
+                HOSTNAME="$1"
+                ;;
+        esac
+    fi
+    shift
+done
+
+if [[ $HAS_T == 0 ]]; then
+    USER_ARGS+=("-t")
+fi
+
 # Here we do /usr/bin/env sh rather than exec sh to avoid adding this command
 # to the login shell's history.
+ENCODED_BA=$(printf %s "$BOOLEAN_ARGS" | base64_encode)
 $SSH \
--t \
--o \
-ControlMaster=auto \
--o \
-ControlPath=~/.ssh/control-%h-%p-%r \
--o \
-ControlPersist=yes \
--o \
-ServerAliveInterval=60 \
--o \
-ServerAliveCountMax=5 \
--o \
-TCPKeepAlive=no \
+"${USER_ARGS[@]}" \
 -- \
-$1 \
+"$HOSTNAME" \
 /usr/bin/env \
 sh \
 -c \
 "$eval_cmd" \
-\'"$sanitized main $TOKEN ${UNIQUEID} $SSHARGS"\'
+\'"$sanitized main $TOKEN ${UNIQUEID} $ENCODED_BA $SSHARGS"\'
 
 print_osc
 printf "1337;EndSSH=%s" "${UNIQUEID}"
