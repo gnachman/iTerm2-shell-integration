@@ -124,6 +124,10 @@ fi
 # Here we do /usr/bin/env sh rather than exec sh to avoid adding this command
 # to the login shell's history.
 ENCODED_BA=$(printf %s "$BOOLEAN_ARGS" | base64_encode)
+
+# If ssh gets a signal, let it2ssh keep running.
+set +e
+
 $SSH \
 "${USER_ARGS[@]}" \
 -- \
