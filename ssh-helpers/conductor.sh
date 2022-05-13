@@ -236,8 +236,8 @@ conductor_cmd_run() {
 }
 
 really_run() {
-    log really_run $*
-    exec $*
+    log exec "$SHELL" -c "$*"
+    exec "$SHELL" -c "$*"
 }
 
 # Untar a base64-encoded file at a specified location.
