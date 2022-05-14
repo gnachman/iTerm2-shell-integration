@@ -243,6 +243,8 @@ really_run() {
 # Untar a base64-encoded file at a specified location.
 conductor_cmd_write() {
     log conductor_cmd_write
+    log have $# arguments
+    log will write to "$2"
 
     local b64data=$1
     # Use eval to expand $HOME
@@ -326,7 +328,16 @@ handle_command() {
 iterate() {
     log iterate
 
-    read line
+    line=""
+    while true; do
+        read part
+        log read part "$part"
+        if [ -z "$part" ]; then
+            break
+        fi
+        line="${line}${part}"
+    done
+
     log read line "$line"
     handle_command "$line"
 }
@@ -353,6 +364,7 @@ main() {
     local sshargs="$4"
 
     log starting with token $token
+    log $(env)
 
     trap "cleanup" EXIT
     drain_stdin
