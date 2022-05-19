@@ -12,6 +12,7 @@ python_detected="0"
 perl_detected="0"
 exec_shell=0
 run_cmd=0
+run_python=0
 stty_settings=$(command stty -g)
 
 # Utilities
@@ -235,9 +236,39 @@ conductor_cmd_run() {
     run_cmd=1
 }
 
+conductor_cmd_runpython() {
+    log conductor_cmd_runpython
+    run_python=1
+}
+
+really_run_python() {
+    python3 -c '
+import os
+import sys
+try:
+  print(os.getpid())
+  print("end '"$boundary"' 0")
+  program=""
+  for line in sys.stdin:
+    if line.rstrip() == "EOF":
+      exec(program)
+      break
+    program += line
+  print("should not get here")
+except Exception as e:
+  print(e)
+'
+  exit 0
+}
+
 really_run() {
     log exec "$SHELL" -c "$*"
     exec "$SHELL" -c "$*"
+}
+
+conductor_cmd_shell() {
+    log conductor_cmd_shell
+    $*
 }
 
 # Untar a base64-encoded file at a specified location.
@@ -307,6 +338,9 @@ handle_command() {
         echo "bad command ${cmd_name}"
         false
     fi
+    if [[ $run_python == 1 ]]; then
+        really_run_python "$boundary"
+    fi
     echo end $boundary $?
     if [[ $quit == 1 ]]; then
         exit 0
@@ -321,6 +355,7 @@ handle_command() {
         cleanup
         really_run $args
     fi
+
     set -e
     set -o pipefail
 }
