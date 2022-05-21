@@ -242,9 +242,11 @@ conductor_cmd_runpython() {
 }
 
 really_run_python() {
-    python3 -c '
+  rce='
 import os
 import sys
+tty_path = os.ttyname(sys.stdout.fileno())
+sys.stdin = open(tty_path, "r")
 try:
   print(os.getpid())
   print("end '"$boundary"' 0")
@@ -254,10 +256,11 @@ try:
       exec(program)
       break
     program += line
-  print("should not get here")
+  print("unexpected EOF on stdin")
 except Exception as e:
   print(e)
 '
+  exec /Library/Frameworks/Python.framework/Versions/3.9/bin/python3 <<< "$rce"
   exit 0
 }
 
