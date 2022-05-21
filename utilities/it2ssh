@@ -132,7 +132,7 @@ $SSH \
 "${USER_ARGS[@]}" \
 -- \
 "$HOSTNAME" \
-/usr/bin/env \
+exec \
 sh \
 -c \
 "$eval_cmd" \
