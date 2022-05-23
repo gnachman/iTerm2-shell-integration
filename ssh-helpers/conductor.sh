@@ -29,7 +29,7 @@ die() {
     exit 1
 }
 
-it2ssh_verbose=0
+it2ssh_verbose=1
 
 log() {
     if [[ $it2ssh_verbose == 0 ]]; then
@@ -260,7 +260,7 @@ try:
 except Exception as e:
   print(e)
 '
-  exec /Library/Frameworks/Python.framework/Versions/3.9/bin/python3 <<< "$rce"
+  exec python3 <<< "$rce"
   exit 0
 }
 
