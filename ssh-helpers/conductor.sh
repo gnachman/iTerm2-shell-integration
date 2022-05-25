@@ -249,7 +249,7 @@ tty_path = os.ttyname(sys.stdout.fileno())
 sys.stdin = open(tty_path, "r")
 try:
   print(os.getpid())
-  print("end '"$boundary"' 0")
+  print("end '"$boundary"' r 0")
   program=""
   for line in sys.stdin:
     if line.rstrip() == "EOF":
@@ -344,7 +344,7 @@ handle_command() {
     if [[ $run_python == 1 ]]; then
         really_run_python "$boundary"
     fi
-    echo end $boundary $?
+    echo end $boundary $? r
     if [[ $quit == 1 ]]; then
         exit 0
     fi
