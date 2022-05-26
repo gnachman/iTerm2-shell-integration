@@ -406,8 +406,8 @@ main() {
 
     trap "cleanup" EXIT
     drain_stdin
+    stty -echo
     print_dcs "$token" "$uniqueid" "$booleanargs" "$sshargs"
-    command stty "-echo" < /dev/tty
 
     log begin mainloop
 
