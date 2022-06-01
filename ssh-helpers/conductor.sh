@@ -216,11 +216,6 @@ really_exec_login_shell() {
     exec_login_shell $(guess_login_shell)
 }
 
-conductor_cmd_get_shell() {
-    log conductor_cmd_get_shell
-    echo $(guess_login_shell)
-}
-
 # Set an environment variable.
 conductor_cmd_setenv() {
     log conductor_cmd_setenv
@@ -248,30 +243,36 @@ import sys
 tty_path = os.ttyname(sys.stdout.fileno())
 sys.stdin = open(tty_path, "r")
 try:
-  print(os.getpid())
-  print("end '"$boundary"' r 0")
+  print(f"\033]135;:{os.getpid()}\033\\\033]135;:end '"$boundary"' r 0\033\\", end="", flush=True)
   program=""
   for line in sys.stdin:
     if line.rstrip() == "EOF":
       exec(program)
+      print(f"\033]135;:unhook\033\\", end="", flush=True)
       break
     program += line
-  print("unexpected EOF on stdin")
 except Exception as e:
   print(e)
 '
   exec python3 <<< "$rce"
+  log "unexpected return from exec"
   exit 0
 }
 
 really_run() {
     log exec "$SHELL" -c "$*"
+    printf "\e]135;:"
     exec "$SHELL" -c "$*"
+    printf "\e\\"
 }
 
 conductor_cmd_shell() {
     log conductor_cmd_shell
+    printf "\e]135;:"
+    set +e
+    set +o pipefail
     $*
+    printf "\e\\"
 }
 
 # Untar a base64-encoded file at a specified location.
@@ -309,12 +310,8 @@ conductor_cmd_quit() {
     quit=1
 }
 
-conductor_cmd_ps() {
-    command ps -eo pid,ppid,command | cat
-}
-
-conductor_cmd_getpid() {
-    echo $$
+write() {
+    printf "\e]135;:%s\e\\" "$*"
 }
 
 # Main Loop
@@ -331,30 +328,30 @@ handle_command() {
     log args is $args
 
     local boundary="${RANDOM}${RANDOM}${RANDOM}${RANDOM}"
-    echo begin $boundary
+    write begin $boundary
     log invoke $cmd_name with arguments $args
     set +e
     set +o pipefail
     if [[ $(type -t conductor_cmd_${cmd_name}) == function ]]; then
         conductor_cmd_${cmd_name} $args
     else
-        echo "bad command ${cmd_name}"
+        write "bad command ${cmd_name}"
         false
     fi
     if [[ $run_python == 1 ]]; then
         really_run_python "$boundary"
     fi
-    echo end $boundary $? r
+    write end $boundary $? r
     if [[ $quit == 1 ]]; then
         exit 0
     fi
     if [[ $exec_shell == 1 ]]; then
-        echo unhook
+        write unhook
         cleanup
         really_exec_login_shell
     fi
     if [[ $run_cmd == 1 ]]; then
-        echo unhook
+        write unhook
         cleanup
         really_run $args
     fi
@@ -406,7 +403,7 @@ main() {
 
     trap "cleanup" EXIT
     drain_stdin
-    stty -echo
+    stty -echo -onlcr -opost
     print_dcs "$token" "$uniqueid" "$booleanargs" "$sshargs"
 
     log begin mainloop
