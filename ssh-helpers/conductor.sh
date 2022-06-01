@@ -29,7 +29,7 @@ die() {
     exit 1
 }
 
-it2ssh_verbose=1
+it2ssh_verbose=0
 
 log() {
     if [[ $it2ssh_verbose == 0 ]]; then
