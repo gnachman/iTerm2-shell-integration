@@ -219,6 +219,11 @@ really_exec_login_shell() {
 # Set an environment variable.
 conductor_cmd_setenv() {
     log conductor_cmd_setenv
+    if [ "$#" -ne 2 ]; then
+        log bad args
+        (exit 1)
+        return
+    fi
     local name=$1
     local value=$2
 
@@ -260,6 +265,12 @@ except Exception as e:
 }
 
 really_run() {
+    log really_run
+    if [ "$#" -lt 1 ]; then
+        log bad args
+        (exit 1)
+        return
+    fi
     log exec "$SHELL" -c "$*"
     printf "\e]135;:"
     exec "$SHELL" -c "$*"
@@ -268,6 +279,11 @@ really_run() {
 
 conductor_cmd_shell() {
     log conductor_cmd_shell
+    if [ "$#" -lt 2 ]; then
+        log bad args
+        (exit 1)
+        return
+    fi
     printf "\e]135;:"
     set +e
     set +o pipefail
@@ -279,6 +295,12 @@ conductor_cmd_shell() {
 conductor_cmd_write() {
     log conductor_cmd_write
     log have $# arguments
+    if [ "$#" -ne 2 ]; then
+        log bad args
+        (exit 1)
+        return
+    fi
+
     log will write to "$2"
 
     local b64data=$1
@@ -299,6 +321,13 @@ conductor_cmd_write() {
 }
 
 conductor_cmd_cd() {
+    log cd
+    if [ "$#" -ne 1 ]; then
+        log "bad args"
+        (exit 1)
+        return
+    fi
+
     local dir=$1
 
     log cd $dir
