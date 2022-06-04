@@ -341,7 +341,8 @@ conductor_cmd_quit() {
 conductor_cmd_getshell() {
     log getshell
     printf "\e]135;:"
-    guess_login_shell
+    echo $(guess_login_shell)
+    echo ~
     printf "\e\\"
 }
 
