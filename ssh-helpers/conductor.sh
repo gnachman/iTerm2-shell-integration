@@ -156,9 +156,8 @@ using_shell_env() {
 
 guess_login_shell() {
     [ -n "$login_shell" ] || using_getent || using_id || using_python || using_perl || using_passwd || using_shell_env || login_shell="sh"
-    shell_name=$(command basename $login_shell)
-    log login shell is ${shell_name}
-    printf "%s" ${shell_name}
+    printf "%s" ${login_shell}
+    log login shell is ${login_shell}
 }
 
 # Execute login shell
@@ -213,7 +212,7 @@ conductor_cmd_exec_login_shell() {
 }
 
 really_exec_login_shell() {
-    exec_login_shell $(guess_login_shell)
+    exec_login_shell $(command basename $(guess_login_shell))
 }
 
 # Set an environment variable.
@@ -306,7 +305,7 @@ conductor_cmd_write() {
     local b64data=$1
     # Use eval to expand $HOME
     local destination=$(eval printf %s "$2")
-
+    mkdir -p "$destination" || true
     log writing to $destination based on $2
 
     # extract the tar file atomically, in the sense that any file from the
@@ -337,6 +336,13 @@ conductor_cmd_cd() {
 conductor_cmd_quit() {
     log quit
     quit=1
+}
+
+conductor_cmd_getshell() {
+    log getshell
+    printf "\e]135;:"
+    guess_login_shell
+    printf "\e\\"
 }
 
 write() {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+unset OS_ACTIVITY_DT_MODE
 
 if [ "$#" -eq 0 ]; then
     ssh 2>&1 | sed -e 's/usage: ssh/usage: it2ssh/' >&2
