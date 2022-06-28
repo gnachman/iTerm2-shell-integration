@@ -74,7 +74,7 @@ echo -n '[1337n'
 echo -n '[5n'
 
 version_string=$(read_dsr)
-if [ "${version_string}" != "0" -a "${version_string}" != "3" ]; then
+if [ -n "${version_string}" -a "${version_string}" != "0" -a "${version_string}" != "3" ]; then
   # Already read DSR 1337. Read DSR 5 and throw it away.
   dsr=$(read_dsr)
 else
