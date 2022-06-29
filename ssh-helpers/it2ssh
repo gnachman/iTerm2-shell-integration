@@ -74,7 +74,11 @@ printf "1337;Env=report=all:"
 command env | base64_encode
 print_st
 
-SSHARGS=$(printf %s "$*" | base64_encode)
+requote() {
+  printf "%q " "$@"
+}
+
+SSHARGS=$(requote "$@" | base64_encode)
 UNIQUEID=${RANDOM}${RANDOM}
 
 USER_ARGS=()

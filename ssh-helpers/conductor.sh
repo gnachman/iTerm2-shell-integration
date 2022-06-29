@@ -341,8 +341,10 @@ conductor_cmd_quit() {
 conductor_cmd_getshell() {
     log getshell
     printf "\e]135;:"
-    echo $(guess_login_shell)
+    shell=$(guess_login_shell)
+    echo "$shell"
     echo ~
+    $shell --version || true
     printf "\e\\"
 }
 
@@ -436,6 +438,10 @@ main() {
 
     log starting with token $token
     log $(env)
+    log "token: $token"
+    log "uniqueid: $uniqueid"
+    log "booleanargs: $booleanargs"
+    log "sshargs: $sshargs"
 
     trap "cleanup" EXIT
     drain_stdin
