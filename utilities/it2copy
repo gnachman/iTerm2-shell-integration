@@ -39,6 +39,45 @@ function print_st() {
     fi
 }
 
+send_tmux() {
+    uid=$RANDOM$RANDOM
+    print_osc
+    inosc=1
+    printf '1337;Copy=2;%s' "$uid"
+    print_st
+    inosc=0
+    fold | while read line
+    do
+        print_osc
+        inosc=1
+        printf '1337;Copy=3;%s:%s' "$uid" "$line"
+        print_st
+        inosc=0
+    done
+
+    print_osc
+    inosc=1
+    printf '1337;Copy=4;%s' "$uid"
+    print_st
+    inosc=0
+}
+
+send_regular() {
+    print_osc
+    inosc=1
+    printf '1337;Copy=:%s' "$data"
+    print_st
+    inosc=0
+}
+
+send() {
+    if [[ $TERM == tmux* ]]; then
+        send_tmux
+    else
+        send_regular
+    fi
+}
+
 # Look for command line flags.
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,12 +92,7 @@ while [ $# -gt 0 ]; do
       ;;
     *)
         if [ -r "$1" ] ; then
-            data=$(base64 < "$1")
-            print_osc
-            inosc=1
-            printf '1337;Copy=:%s' "$data"
-            print_st
-            inosc=0
+            base64 < $1 | send
             exit 0
         else
             error "it2copy: $1: No such file or directory"
@@ -69,10 +103,4 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-data=$(base64)
-print_osc
-inosc=1
-printf '1337;Copy=:%s' "$data"
-print_st
-inosc=0
-
+base64 | send
