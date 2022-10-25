@@ -37,13 +37,28 @@ if begin; status --is-interactive; and not functions -q -- iterm2_status; and [ 
     end
   end
 
+  function iterm2_base64
+    base64
+  end
+
+  if type -q sw_vers
+    set ver (printf "%.0f" (sw_vers | grep ProductVersion | cut -d':' -f2 | tr -d ' ' | sed -e 's/ //g'))
+    if [ $ver -ge 13 ]
+      functions -e iterm2_base64
+      function iterm2_base64
+        perl -MMIME::Base64 -e 'print encode_base64(join("", <>))'
+      end
+    end
+  end
+
+
   # Usage: iterm2_set_user_var key value
   # These variables show up in badges (and later in other places). For example
   # iterm2_set_user_var currentDirectory "$PWD"
   # Gives a variable accessible in a badge by \(user.currentDirectory)
   # Calls to this go in iterm2_print_user_vars.
   function iterm2_set_user_var
-    printf "\033]1337;SetUserVar=%s=%s\007" $argv[1] (printf "%s" $argv[2] | base64 | tr -d "\n")
+    printf "\033]1337;SetUserVar=%s=%s\007" $argv[1] (printf "%s" $argv[2] | iterm2_base64 | tr -d "\n")
   end
 
   function iterm2_write_remotehost_currentdir_uservars
@@ -122,5 +137,5 @@ if begin; status --is-interactive; and not functions -q -- iterm2_status; and [ 
   end
 
   iterm2_write_remotehost_currentdir_uservars
-  printf "\033]1337;ShellIntegrationVersion=18;shell=fish\007"
+  printf "\033]1337;ShellIntegrationVersion=19;shell=fish\007"
 end

@@ -25,8 +25,21 @@ if [[ -o interactive ]]; then
       fi
     }
 
+    function iterm2_base64() {
+      base64
+    }
+    if command -v sw_vers > /dev/null 2>&1; then
+      ver=$(printf "%.0f" $(sw_vers | grep ProductVersion | cut -d':' -f2 | tr -d ' ' | sed -e 's/ //g'))
+      if (( $ver >= 13 )); then
+        unset -f iterm2_base64
+        function iterm2_base64() {
+          perl -MMIME::Base64 -e 'print encode_base64(join("", <>))'
+        }
+      fi
+    fi
+
     iterm2_set_user_var() {
-      printf "\033]1337;SetUserVar=%s=%s\007" "$1" $(printf "%s" "$2" | base64 | tr -d '\n')
+      printf "\033]1337;SetUserVar=%s=%s\007" "$1" $(printf "%s" "$2" | iterm2_base64 | tr -d '\n')
     }
 
     # Users can write their own version of this method. It should call
@@ -173,6 +186,6 @@ if [[ -o interactive ]]; then
     preexec_functions=($preexec_functions iterm2_preexec)
 
     iterm2_print_state_data
-    printf "\033]1337;ShellIntegrationVersion=14;shell=zsh\007"
+    printf "\033]1337;ShellIntegrationVersion=15;shell=zsh\007"
   fi
 fi

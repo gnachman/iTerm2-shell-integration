@@ -59,7 +59,7 @@ if ( ! ($?iterm2_shell_integration_installed)) then
       alias _iterm2_current_dir "(_iterm2_start; _iterm2_print_current_dir; _iterm2_end)"
 
       # Define aliases for printing the shell integration version this script is written against
-      alias _iterm2_print_shell_integration_version 'printf "1337;ShellIntegrationVersion=7;shell=tcsh"'
+      alias _iterm2_print_shell_integration_version 'printf "1337;ShellIntegrationVersion=8;shell=tcsh"'
       alias _iterm2_shell_integration_version "(_iterm2_start; _iterm2_print_shell_integration_version; _iterm2_end)"
 
       # Define aliases for defining the boundary between a command prompt and the
@@ -90,8 +90,17 @@ if ( ! ($?iterm2_shell_integration_installed)) then
       # Usage: iterm2_set_user_var key `printf "%s" value | base64`
       alias iterm2_set_user_var 'printf "\033]1337;SetUserVar=%s=%s\007"'
 
+      alias _iterm2_base64 base64
+      if (`where sw_vers` != "") then
+	set _iterm2_os_ver=`sw_vers | grep ProductVersion | cut -d':' -f2 | tr -d ' ' | sed -e 's/ //g'`
+	set _iterm2_os_ver=`printf "%.0f" $_iterm2_os_ver`
+	if ($_iterm2_os_ver >= 13) then
+	  alias _iterm2_base64 "perl -MMIME::Base64 -e 'print encode_base64(join("'"", <>))'"'"
+	endif
+      endif
+
       # User may override this to set user-defined vars. It should look like this, because your shell is terrible for scripting:
-      # alias _iterm2_user_defined_vars (iterm2_set_user_var key1 `printf "%s" value1 | base64`; iterm2_set_user_var key2 `printf "%s" value2 | base64`; ...)
+      # alias _iterm2_user_defined_vars (iterm2_set_user_var key1 `printf "%s" value1 | _iterm2_base64`; iterm2_set_user_var key2 `printf "%s" value2 | _iterm2_base64`; ...)
       (which _iterm2_user_defined_vars >& /dev/null) || alias _iterm2_user_defined_vars ''
 
       # Combines all status update aliases
