@@ -474,10 +474,23 @@ function iterm2_print_state_data() {
   iterm2_print_user_vars
 }
 
+function iterm2_base64() {
+  base64
+}
+if command -v sw_vers > /dev/null 2>&1; then
+  ver=$(printf "%.0f" $(sw_vers | grep ProductVersion | cut -d':' -f2 | tr -d ' ' | sed -e 's/ //g'))
+  if (( $ver >= 13 )); then
+    unset -f iterm2_base64
+    function iterm2_base64() {
+      perl -MMIME::Base64 -e 'print encode_base64(join("", <>))'
+    }
+  fi
+fi
+
 # Usage: iterm2_set_user_var key value
 function iterm2_set_user_var() {
   iterm2_begin_osc
-  printf "1337;SetUserVar=%s=%s" "$1" $(printf "%s" "$2" | base64 | tr -d '\n')
+  printf "1337;SetUserVar=%s=%s" "$1" $(printf "%s" "$2" | iterm2_base64 | tr -d '\n')
   iterm2_end_osc
 }
 
@@ -511,7 +524,7 @@ function iterm2_prompt_suffix() {
 
 function iterm2_print_version_number() {
   iterm2_begin_osc
-  printf "1337;ShellIntegrationVersion=18;shell=bash"
+  printf "1337;ShellIntegrationVersion=19;shell=bash"
   iterm2_end_osc
 }
 
