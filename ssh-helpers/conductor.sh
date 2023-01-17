@@ -63,7 +63,9 @@ first_word() {
 drop_first_word() {
     local input="$1"
     log drop first word from: "$input"
-    printf "%s" "${input#* }"
+    if [[ $input == *" "* ]]; then
+        printf "%s" "${input#* }"
+    fi
 }
 
 if command -v base64 > /dev/null 2> /dev/null; then
@@ -241,6 +243,7 @@ conductor_cmd_runpython() {
 }
 
 really_run_python() {
+  log really_run_python
   rce='
 import os
 import sys
@@ -264,7 +267,7 @@ except Exception as e:
 }
 
 really_run() {
-    log really_run
+    log "really_run $@"
     if [ "$#" -lt 1 ]; then
         log bad args
         (exit 1)
@@ -348,6 +351,18 @@ conductor_cmd_getshell() {
     printf "\e\\"
 }
 
+conductor_cmd_eval() {
+    log "eval $@"
+    local b64="$1"
+    local mydir=$(mktemp -d "${TMPDIR:-/tmp/}it2ssh.XXXXXXXXXXXX")
+    local file="$mydir/it2ssh-eval"
+    log "mydir=$mydir tmpdir=${TMPDIR:-/tmp/} file=$file"
+    base64_decode <<< "$b64" > "$file"
+    source "$file"
+    rm -f "$file"
+    log "$file" finished executing
+}
+
 write() {
     printf "\e]135;:%s\e\\" "$*"
 }
@@ -384,11 +399,13 @@ handle_command() {
         exit 0
     fi
     if [[ $exec_shell == 1 ]]; then
+        log successfully executed the login shell. Unhook.
         write unhook
         cleanup
         really_exec_login_shell
     fi
     if [[ $run_cmd == 1 ]]; then
+        log successfully ran a command. Unhook.
         write unhook
         cleanup
         really_run $args
