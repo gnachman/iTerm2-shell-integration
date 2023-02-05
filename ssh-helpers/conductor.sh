@@ -448,10 +448,10 @@ drain_stdin() {
 }
 
 main() {
-    local token="$1"
-    local uniqueid="$2"
-    local booleanargs="$3"
-    local sshargs="$4"
+    local token=$(base64_decode <<< $1)
+    local uniqueid=$(base64_decode <<< $2)
+    local booleanargs=$(base64_decode <<< $3)
+    local sshargs=$(base64_decode <<< $4)
 
     log starting with token $token
     log $(env)
