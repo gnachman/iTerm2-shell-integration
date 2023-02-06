@@ -1,8 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/sh
 # Usage:
 # conductor.sh token
-
-set -euo pipefail
 
 # Global variables
 login_shell=""
@@ -32,7 +30,7 @@ die() {
 it2ssh_verbose=0
 
 log() {
-    if [[ $it2ssh_verbose == 0 ]]; then
+    if [ "$it2ssh_verbose" -eq 0 ]; then
         return
     fi
     printf "[$$] %s: %s\n" $(date +%H:%M:%S) "$*" >> /tmp/it2ssh.log
@@ -63,16 +61,16 @@ first_word() {
 drop_first_word() {
     local input="$1"
     log drop first word from: "$input"
-    if [[ $input == *" "* ]]; then
+    if [ "${input#* }" != "$input" ]; then
         printf "%s" "${input#* }"
     fi
 }
 
-if command -v base64 > /dev/null 2> /dev/null; then
+if command -v base64 > /dev/null 2>&1; then
     log "found base64 command"
     base64_encode() { command base64 | command tr -d \\n\\r; }
     base64_decode() { command base64 -d; }
-elif command -v b64encode > /dev/null 2> /dev/null; then
+elif command -v b64encode > /dev/null 2>&1; then
     log "found b64encode, b64decode commands"
     base64_encode() { command b64encode - | command sed '1d;$d' | command tr -d \\n\\r; }
     base64_decode() { command fold -w 76 | command b64decode -r; }
@@ -99,10 +97,10 @@ parse_passwd_record() {
 # sets $login_shell as a side effect.
 # returns if it looks executable.
 login_shell_is_ok() {
-    log login_shell_is_ok
+    log login_shell_is_ok with arg "$1"
     [ -n "$1" ] && login_shell=$(echo $1 | parse_passwd_record)
     [ -n "$login_shell" -a -x "$login_shell" ] && return 0
-    log "login shell of $login_shell is ok"
+    log "login shell of $login_shell is bad"
     return 1
 }
 
@@ -126,7 +124,7 @@ detect_python() {
     [ -z "$python" ] && python=$(command -v python2)
     [ -z "$python" ] && python=$(command -v python)
     if [ -z "$python" -o ! -x "$python" ]; then python=""; return 1; fi
-    log no python
+    log found python at $python
     return 0
 }
 
@@ -143,7 +141,7 @@ detect_perl() {
     perl_detected="1"
     perl=$(command -v perl)
     if [ -z "$perl" -o ! -x "$perl" ]; then perl=""; return 1; fi
-    log no perl
+    log found perl at $perl
     return 0
 }
 
@@ -158,8 +156,8 @@ using_shell_env() {
 
 guess_login_shell() {
     [ -n "$login_shell" ] || using_getent || using_id || using_python || using_perl || using_passwd || using_shell_env || login_shell="sh"
-    printf "%s" ${login_shell}
-    log login shell is ${login_shell}
+    printf "%s" "$login_shell"
+    log login shell is "$login_shell"
 }
 
 # Execute login shell
@@ -175,8 +173,7 @@ execute_with_perl() {
 
 execute_with_python() {
     if detect_python; then
-        log execute login shell using python
-        exec "$perl" "-e" "exec {'$login_shell'} '-$shell_name'"
+        log execute login shell: "$python" "-c" "import os; os.execlp('$login_shell', '-' '$shell_name')"
         exec "$python" "-c" "import os; os.execlp('$login_shell', '-' '$shell_name')"
     fi
     return 1
@@ -184,8 +181,9 @@ execute_with_python() {
 
 exec_login_shell() {
     local login_shell=${1}
+    shell_name=$(command basename "$login_shell")
 
-    log exec_login_shell "$login_shell"
+    log exec_login_shell "$login_shell" with name "$shell_name"
 
     # We need to pass the first argument to the executed program with a leading -
     # to make sure the shell executes as a login shell. Note that not all shells
@@ -198,6 +196,7 @@ exec_login_shell() {
     log failed, just run it with -l
     # TODO - this is complicated, come back and do it later.
     #execute_sh_with_posix_env
+    unset RCOUNT
     exec "$login_shell" "-l"
     log failed completely
     printf "%s\n" "Could not execute the shell $login_shell as a login shell" > /dev/stderr
@@ -214,7 +213,7 @@ conductor_cmd_exec_login_shell() {
 }
 
 really_exec_login_shell() {
-    exec_login_shell $(command basename $(guess_login_shell))
+    exec_login_shell $(guess_login_shell)
 }
 
 # Set an environment variable.
@@ -244,24 +243,24 @@ conductor_cmd_runpython() {
 
 really_run_python() {
   log really_run_python
-  rce='
+  unset RCOUNT
+  exec python3 << ENDOFSCRIPT
 import os
 import sys
 tty_path = os.ttyname(sys.stdout.fileno())
 sys.stdin = open(tty_path, "r")
 try:
-  print(f"\033]135;:{os.getpid()}\033\\\033]135;:end '"$boundary"' r 0\033\\", end="", flush=True)
+  print(f"\033]135;:{os.getpid()}\033\\\033]135;:end $boundary r 0\033\\\\", end="", flush=True)
   program=""
   for line in sys.stdin:
     if line.rstrip() == "EOF":
       exec(program)
-      print(f"\033]135;:unhook\033\\", end="", flush=True)
+      print(f"\033]135;:unhook\033\\\\", end="", flush=True)
       break
     program += line
 except Exception as e:
   print(e)
-'
-  exec python3 <<< "$rce"
+ENDOFSCRIPT
   log "unexpected return from exec"
   exit 0
 }
@@ -275,20 +274,21 @@ really_run() {
     fi
     log exec "$SHELL" -c "$*"
     printf "\e]135;:"
+    unset RCOUNT
     exec "$SHELL" -c "$*"
     printf "\e\\"
 }
 
 conductor_cmd_shell() {
     log conductor_cmd_shell
-    if [ "$#" -lt 2 ]; then
+    if [ "$#" -lt 1 ]; then
         log bad args
         (exit 1)
         return
     fi
     printf "\e]135;:"
     set +e
-    set +o pipefail
+    log will run $*
     $*
     printf "\e\\"
 }
@@ -357,8 +357,9 @@ conductor_cmd_eval() {
     local mydir=$(mktemp -d "${TMPDIR:-/tmp/}it2ssh.XXXXXXXXXXXX")
     local file="$mydir/it2ssh-eval"
     log "mydir=$mydir tmpdir=${TMPDIR:-/tmp/} file=$file"
-    base64_decode <<< "$b64" > "$file"
-    source "$file"
+    printf "%s" "$b64" | base64_decode > "$file"
+    log will source "$file" with content $(cat "$file")
+    . "$file"
     rm -f "$file"
     log "$file" finished executing
 }
@@ -370,6 +371,17 @@ write() {
 # Main Loop
 ################################################################################
 
+randomnumber() {
+    if [ -z "${RCOUNT}" ]; then
+      export RCOUNT=0
+    else
+      export RCOUNT=$((RCOUNT + 1))
+    fi
+
+    printf "%s." $RCOUNT
+    awk 'BEGIN { srand(); print int(rand() * 65536)""int(rand() * 65536)""int(rand() * 65536)""int(rand() * 65536) }'
+}
+
 handle_command() {
     local unparsed=${1}
 
@@ -380,31 +392,31 @@ handle_command() {
     local args=$(drop_first_word "${unparsed}")
     log args is $args
 
-    local boundary="${RANDOM}${RANDOM}${RANDOM}${RANDOM}"
+    local boundary=$(randomnumber)
     write begin $boundary
     log invoke $cmd_name with arguments $args
     set +e
-    set +o pipefail
-    if [[ $(type -t conductor_cmd_${cmd_name}) == function ]]; then
+    if ( LC_ALL=C type conductor_cmd_${cmd_name} 2>/dev/null | head -n 1 | grep -q function ); then
         conductor_cmd_${cmd_name} $args
     else
         write "bad command ${cmd_name}"
         false
     fi
-    if [[ $run_python == 1 ]]; then
+    if [ $run_python = 1 ]; then
         really_run_python "$boundary"
     fi
     write end $boundary $? r
-    if [[ $quit == 1 ]]; then
+    if [ $quit = 1 ]; then
+        log quitting
         exit 0
     fi
-    if [[ $exec_shell == 1 ]]; then
+    if [ $exec_shell = 1 ]; then
         log successfully executed the login shell. Unhook.
         write unhook
         cleanup
         really_exec_login_shell
     fi
-    if [[ $run_cmd == 1 ]]; then
+    if [ $run_cmd = 1 ]; then
         log successfully ran a command. Unhook.
         write unhook
         cleanup
@@ -412,7 +424,6 @@ handle_command() {
     fi
 
     set -e
-    set -o pipefail
 }
 
 iterate() {
@@ -438,7 +449,7 @@ drain_stdin() {
   while :
   do
       key="$(printf x; dd bs=1 count=1 2> /dev/null; printf x)"
-      if [[ "$key" == "xx" ]]; then
+      if [ "$key" = "xx" ]; then
           log "done draining"
           break
       fi
@@ -448,10 +459,10 @@ drain_stdin() {
 }
 
 main() {
-    local token=$(base64_decode <<< $1)
-    local uniqueid=$(base64_decode <<< $2)
-    local booleanargs=$(base64_decode <<< $3)
-    local sshargs=$(base64_decode <<< $4)
+    local token=$(printf "%s" "$1" | base64_decode)
+    local uniqueid=$(printf "%s" "$2" | base64_decode)
+    local booleanargs=$(printf "%s" "$3" | base64_decode)
+    local sshargs=$(printf "%s" "$4" | base64_decode)
 
     log starting with token $token
     log $(env)
