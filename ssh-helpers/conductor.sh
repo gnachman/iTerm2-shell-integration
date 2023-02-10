@@ -244,18 +244,21 @@ conductor_cmd_runpython() {
 really_run_python() {
   log really_run_python
   unset RCOUNT
+  ttypath=$(tty)
+  log "tty is $ttypath"
   exec python3 << ENDOFSCRIPT
 import os
 import sys
-tty_path = os.ttyname(sys.stdout.fileno())
+tty_path = "$ttypath"
 sys.stdin = open(tty_path, "r")
 try:
-  print(f"\033]135;:{os.getpid()}\033\\\033]135;:end $boundary r 0\033\\\\", end="", flush=True)
+  print(f"\\033]135;:{os.getpid()}\\033\\\\", end="", flush=True)
+  print(f"\\033]135;:end $boundary r 0\\033\\\\", end="", flush=True)
   program=""
   for line in sys.stdin:
     if line.rstrip() == "EOF":
       exec(program)
-      print(f"\033]135;:unhook\033\\\\", end="", flush=True)
+      print(f"\\033]135;:unhook\\033\\\\", end="", flush=True)
       break
     program += line
 except Exception as e:
