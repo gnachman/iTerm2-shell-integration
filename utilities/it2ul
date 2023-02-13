@@ -68,9 +68,18 @@ function print_st() {
     fi
 }
 
+function b64_encode() {
+    if [[ "$IT2DL_BASE64_VERSION" =~ GNU ]]; then
+        # Disable line wrap
+        base64 -w0
+    else
+        base64
+    fi
+}
+
 function send_request_for_upload() {
   print_osc
-  printf '1337;RequestUpload=format=tgz' ""
+  printf '1337;RequestUpload=format=tgz;version=%s' "$(tar --version | head -1 | b64_encode)"
   print_st
 }
 
