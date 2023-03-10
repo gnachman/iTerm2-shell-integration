@@ -119,12 +119,6 @@ detect_python() {
         [ -n "$python" ] && return 0
         return 1
     fi
-    python_detected="1"
-    python=$(command -v python3)
-    [ -z "$python" ] && python=$(command -v python2)
-    [ -z "$python" ] && python=$(command -v python)
-    if [ -z "$python" -o ! -x "$python" ]; then python=""; return 1; fi
-    log found python at $python
     return 0
 }
 
