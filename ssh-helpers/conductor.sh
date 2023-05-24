@@ -319,7 +319,7 @@ conductor_cmd_write() {
     # suppress STDERR for tar as tar prints various warnings if for instance, timestamps are in the future
     old_umask=$(umask)
     umask 000
-    printf "%s" ${b64data} | base64_decode | command tar "xpzf" "-" "-C" "$destination"
+    printf "%s" ${b64data} | base64_decode | command tar "xpzf" "-" "-C" "$destination" > /dev/null 2>&1
     local rc=$?
     umask "$old_umask"
     (exit $rc)
