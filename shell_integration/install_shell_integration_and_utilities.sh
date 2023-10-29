@@ -27,7 +27,7 @@ function join {
 
 type printf > /dev/null 2>&1 || die "Shell integration requires the printf binary to be in your path."
 
-UTILITIES=(imgcat imgls it2api it2attention it2check it2copy it2dl it2getvar it2git it2setcolor it2setkeylabel it2tip it2ul it2universion it2profile)
+UTILITIES=(imgcat imgls it2api it2attention it2check it2copy it2dl it2getvar it2git it2setcolor it2setkeylabel it2tip it2ul it2universion it2profile it2cat)
 SHELL=${SHELL##*/}
 URL=""
 HOME_PREFIX='${HOME}'
