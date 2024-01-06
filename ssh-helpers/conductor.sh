@@ -239,6 +239,13 @@ conductor_cmd_run() {
     run_cmd=1
 }
 
+conductor_cmd_pythonversion() {
+    log conductor_cmd_pythonversion
+    printf "\e]135;:"
+    command -v python3 >/dev/null 2>&1 && python3 -V
+    printf "\e\\"
+}
+
 conductor_cmd_runpython() {
     log conductor_cmd_runpython
     run_python=1
@@ -446,7 +453,8 @@ iterate() {
     done
 
     log read line "$line"
-    handle_command "$line"
+    log decodes to: $(printf "%s" "$line" | base64_decode)
+    handle_command $(printf "%s" "$line" | base64_decode)
 }
 
 drain_stdin() {
