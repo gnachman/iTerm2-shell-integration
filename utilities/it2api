@@ -2,7 +2,12 @@
 
 import argparse
 import asyncio
-import iterm2
+try:
+  import iterm2
+except ModuleNotFoundError:
+  print("The current version of Python doesn't have the 'iterm2' module installed. Please run:")
+  print("\n    $ python3 -m pip install iterm2\n")
+  exit()
 import logging
 import re
 import sys
