@@ -57,10 +57,6 @@ if [ ! -d ~/.ssh ]; then
     chmod 700 ~/.ssh
 fi
 
-print_osc
-printf "1337;Env=report=all:"
-command env | base64_encode
-print_st
 
 requote() {
   printf "%q " "$@"
@@ -128,16 +124,30 @@ fi
 ENCODED_BA=$(printf %s "$BOOLEAN_ARGS" | base64_encode)
 
 # Send arguments to conductor.sh
-print_osc
+myenv=$(command env | base64_encode)
+osc=$(print_osc)
+st=$(print_st)
+intro=$(
+printf "%s" "$osc"
+printf "1337;Env=report=all:"
+printf "%s" "$myenv"
+printf "%s" "$st"
+
+printf "%s" "$osc"
 printf "1337;it2ssh=$TOKEN ${UNIQUEID} $ENCODED_BA $SSHARGS"
-print_st
+printf "%s" "$st"
+
+printf "%s" "$osc"
+printf "1337;SendConductor=v=2"
+printf "%s" "$st"
+)
 
 if [[ $TERM == screen* ]]; then
     st='\a\033\\'
 else
     st='\a'
 fi
-send_conductor='printf "\033]1337;SendConductor=v=2'"$st"'"'
+send_conductor='printf "%s '"$intro"'"'
 
 # Run a command on the remote host that instructs iTerm2 to send a script, then reads the script and executes it.
 # I tried many ways to concatenate s and l and this is the only one that works on both Ubuntu 18 and Ubuntu 20.
