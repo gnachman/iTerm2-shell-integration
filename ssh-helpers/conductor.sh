@@ -454,7 +454,7 @@ iterate() {
 
     log read line "$line"
     log decodes to: $(printf "%s" "$line" | base64_decode)
-    handle_command $(printf "%s" "$line" | base64_decode)
+    handle_command "$(printf "%s" "$line" | base64_decode)"
 }
 
 drain_stdin() {
