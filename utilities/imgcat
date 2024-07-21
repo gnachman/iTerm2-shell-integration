@@ -61,17 +61,45 @@ function b64_decode() {
 #   height: set output height of the image in character cells, pixels or percent
 #   preserve_aspect_ratio: 0 or 1, if set to 1, fill the specified width and height as much as possible without stretching the image
 #   file: Empty string or file type like "application/json" or ".js".
+#   legacy: 1 to send one giant control sequence, 0 to send many small control sequences.
 function print_image() {
+    # Send metadata to begin transfer.
     print_osc
-    printf "1337;File=inline=%s" "$2"
+    printf "1337;"
+    if [[ "$9" -eq 1 ]]; then
+        printf "File"
+    else
+        printf "MultipartFile"
+    fi
+    printf "=inline=%s" "$2"
     printf ";size=%d" $(printf "%s" "$3" | b64_decode | wc -c)
     [ -n "$1" ] && printf ";name=%s" "$(printf "%s" "$1" | b64_encode)"
     [ -n "$5" ] && printf ";width=%s" "$5"
     [ -n "$6" ] && printf ";height=%s" "$6"
     [ -n "$7" ] && printf ";preserveAspectRatio=%s" "$7"
     [ -n "$8" ] && printf ";type=%s" "$8"
-    printf ":%s" "$3"
-    print_st
+    if [[ "$9" -eq 1 ]]; then
+        printf ":%s" "$3"
+        print_st
+    else
+        print_st
+
+        # Split into 256-byte chunks. This helps it get through tmux.
+        parts=$(printf "%s" "$3" | fold -w 256)
+
+        # Send each part.
+        for part in $parts; do
+            print_osc
+            printf '1337;FilePart=%s' "$part"
+            print_st
+        done
+
+        # Indicate completion
+        print_osc
+        printf '1337;FileEnd'
+        print_st
+    fi
+
     printf '\n'
     [ "$4" == "1" ] && echo "$1"
     has_image_displayed=t
@@ -104,6 +132,7 @@ function show_help() {
     errcho "    -s, --stretch                   Stretch image to specified width and height (this option is opposite to -r)"
     errcho "    -W, --width N                   Set image width to N character cells, pixels or percent (see below)"
     errcho "    -H, --height N                  Set image height to N character cells, pixels or percent (see below)"
+    errcho "    -l, --legacy                    Use legacy protocol that sends the whole image in a single control sequence"
     errcho
     errcho "    If you don't specify width or height an appropriate value will be chosen automatically."
     errcho "    The width and height are given as word 'auto' or number N followed by a unit:"
@@ -160,6 +189,7 @@ fi
 check_dependency base64
 check_dependency wc
 file_type=""
+legacy=0
 
 # Look for command line flags.
 while [ $# -gt 0 ]; do
@@ -189,6 +219,9 @@ while [ $# -gt 0 ]; do
         ;;
     -s | --s | --stretch)
         preserve_aspect_ratio=0
+        ;;
+    -l | --l | --legacy)
+        legacy=1
         ;;
     -f | --f | --file)
         has_stdin=f
@@ -221,7 +254,7 @@ while [ $# -gt 0 ]; do
             exit 2
         fi
         has_stdin=f
-        print_image "$1" 1 "$encoded_image" "$print_filename" "$width" "$height" "$preserve_aspect_ratio" "$file_type"
+        print_image "$1" 1 "$encoded_image" "$print_filename" "$width" "$height" "$preserve_aspect_ratio" "$file_type" "$legacy"
         ;;
     esac
     shift
@@ -229,7 +262,7 @@ done
 
 # Read and print stdin
 if [ $has_stdin = t ]; then
-    print_image "" 1 "$(cat | b64_encode)" 0 "$width" "$height" "$preserve_aspect_ratio" "$file_type"
+    print_image "" 1 "$(cat | b64_encode)" 0 "$width" "$height" "$preserve_aspect_ratio" "$file_type" "$legacy"
 fi
 
 if [ "$has_image_displayed" != "t" ]; then
