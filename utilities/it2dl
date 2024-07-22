@@ -52,7 +52,7 @@ do
       wc -c "$fn" | awk '{printf "size=%d",$1}'
       print_st
 
-      parts=$(b64_encode < "$fn" | fold -w 256)
+      parts=$(b64_encode < "$fn" | fold -w 200)
       for part in $parts; do
           print_osc
           printf '1337;FilePart=%s' "$part"

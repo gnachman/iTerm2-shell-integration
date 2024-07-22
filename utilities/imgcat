@@ -84,8 +84,8 @@ function print_image() {
     else
         print_st
 
-        # Split into 256-byte chunks. This helps it get through tmux.
-        parts=$(printf "%s" "$3" | fold -w 256)
+        # Split into 200-byte chunks. This helps it get through tmux.
+        parts=$(printf "%s" "$3" | fold -w 200)
 
         # Send each part.
         for part in $parts; do
