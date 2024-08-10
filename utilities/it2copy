@@ -65,7 +65,8 @@ send_tmux() {
 send_regular() {
     print_osc
     inosc=1
-    printf '1337;Copy=:%s' "$data"
+    printf '1337;Copy=:%s'
+    cat
     print_st
     inosc=0
 }
