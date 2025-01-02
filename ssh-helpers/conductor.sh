@@ -32,10 +32,7 @@ die() {
 it2ssh_verbose=0
 
 log() {
-    if [ "$it2ssh_verbose" -eq 0 ]; then
-        return
-    fi
-    printf "[$$] %s: %s\n" $(date +%H:%M:%S) "$*" >> /tmp/it2ssh.log
+    return
 }
 
 # Printing control sequences
