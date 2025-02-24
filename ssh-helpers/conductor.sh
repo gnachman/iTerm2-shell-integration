@@ -238,9 +238,9 @@ conductor_cmd_run() {
 
 conductor_cmd_pythonversion() {
     log conductor_cmd_pythonversion
-    printf "\e]135;:"
+    printf "\033]135;:"
     command -v python3 >/dev/null 2>&1 && python3 -V
-    printf "\e\\"
+    printf "\033\\"
 }
 
 conductor_cmd_runpython() {
@@ -283,10 +283,10 @@ really_run() {
         return
     fi
     log exec "$SHELL" -c "$*"
-    printf "\e]135;:"
+    printf "\033]135;:"
     unset RCOUNT
     exec "$SHELL" -c "$*"
-    printf "\e\\"
+    printf "\033\\"
 }
 
 conductor_cmd_shell() {
@@ -296,11 +296,11 @@ conductor_cmd_shell() {
         (exit 1)
         return
     fi
-    printf "\e]135;:"
+    printf "\033]135;:"
     set +e
     log will run $*
     $*
-    printf "\e\\"
+    printf "\033\\"
 }
 
 # Untar a base64-encoded file at a specified location.
@@ -353,12 +353,12 @@ conductor_cmd_quit() {
 
 conductor_cmd_getshell() {
     log getshell
-    printf "\e]135;:"
+    printf "\033]135;:"
     shell=$(guess_login_shell)
     echo "$shell"
     echo ~
     $shell --version || true
-    printf "\e\\"
+    printf "\033\\"
 }
 
 conductor_cmd_eval() {
@@ -375,7 +375,7 @@ conductor_cmd_eval() {
 }
 
 write() {
-    printf "\e]135;:%s\e\\" "$*"
+    printf "\033]135;:%s\033\\" "$*"
 }
 
 # Main Loop
