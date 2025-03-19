@@ -283,10 +283,8 @@ really_run() {
         return
     fi
     log exec "$SHELL" -c "$*"
-    printf "\033]135;:"
     unset RCOUNT
     exec "$SHELL" -c "$*"
-    printf "\033\\"
 }
 
 conductor_cmd_shell() {
