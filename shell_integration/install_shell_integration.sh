@@ -3,12 +3,12 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -21,7 +21,13 @@ function die() {
 
 type printf > /dev/null 2>&1 || die "Shell integration requires the printf binary to be in your path."
 
-SHELL=${SHELL##*/}
+# Non-POSIX shells may leave POSIX shell path in the $SHELL; perform an additional check.
+if [ -n "${XONSHRC}" ]; then
+  SHELL=xonsh
+else
+  SHELL=${SHELL##*/}
+fi
+
 URL=""
 HOME_PREFIX='${HOME}'
 DOTDIR="$HOME"
@@ -63,9 +69,17 @@ then
   SHELL_AND='; and'
   SHELL_OR='; or'
 fi
+if [ "${SHELL}" = xonsh ]
+then
+  URL="https://iterm2.com/shell_integration/xonsh"
+  mkdir -p "${HOME}/.config/xonsh/rc.d/"
+  SCRIPT="${HOME}/.config/xonsh/rc.d/iterm2.xsh"
+  HOME_PREFIX='{$HOME}'
+  QUOTE='"'
+fi
 if [ "${URL}" = "" ]
 then
-  die "Your shell, ${SHELL}, is not supported yet. Only tcsh, zsh, bash, and fish are supported. Sorry!"
+  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, tcsh, xonsh and zsh are supported. Sorry!"
   exit 1
 fi
 
