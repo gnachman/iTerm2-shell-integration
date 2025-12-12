@@ -1,3 +1,6 @@
+fish text linguist-language=Fish
+tcsh text linguist-language=zsh
 xonsh text linguist-language=Python
 *.xsh text linguist-language=Python
 *.xonshrc text linguist-language=Python
+zsh text linguist-language=zsh
