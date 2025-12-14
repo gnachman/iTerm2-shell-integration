@@ -112,9 +112,9 @@ class _iTerm2Xonsh:
 
 
     def add_iterm2_to_prompt(self):
+        $PROMPT_FIELDS['iterm2_prompt_start'] = self.write_prompt_start_osc
+        $PROMPT_FIELDS['iterm2_prompt_end'] = self.write_prompt_end_osc
         if 'iterm2_prompt_start' not in $PROMPT:
-            $PROMPT_FIELDS['iterm2_prompt_start'] = self.write_prompt_start_osc
-            $PROMPT_FIELDS['iterm2_prompt_end'] = self.write_prompt_end_osc
             $PROMPT = '{iterm2_prompt_start}' + $PROMPT + '{iterm2_prompt_end}'
 
 
