@@ -34,7 +34,7 @@ class _iTerm2Xonsh:
     @staticmethod
     def is_iterm2_interactive():
         return (
-            @.env.get('TERM_PROGRAM', False) == 'iTerm.app'
+            'iTerm' in @.env.get('TERM_PROGRAM', '')
             and @.env.get('XONSH_INTERACTIVE', False)
             and @.env.get('TERM','') not in ['linux', 'dumb']
         )
