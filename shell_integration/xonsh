@@ -46,29 +46,23 @@ class _iTerm2Xonsh:
         if (cwd := @.env.get("PWD", @.imp.os.getcwd())):
             self.set_var("CurrentDir", cwd)
 
-
     def set_var(self, name, value):
         self.write_osc(f"1337;{name}={value}")
-
 
     def set_vars(self, vars):
         vars_str = ';'.join([f"{k}={v}" for k,v in vars.items()])
         self.write_osc(f"1337;{vars_str}")
 
-
     def set_user_var(self, key, value):
         b64value = @.imp.base64.b64encode(value.encode("utf-8")).decode("ascii").replace("\n", "")
         self.set_var("SetUserVar", f"{key}={b64value}")
 
-
     def _write_begin_osc(self):
         self.stdout.write("\033]")
-
 
     def _write_end_osc(self):
         self.stdout.write("\007")
         self.stdout.flush()
-
 
     def write_cr(self):
         if @.env.get("TERM_PROGRAM",'') == "iTerm.app":
@@ -82,33 +76,50 @@ class _iTerm2Xonsh:
             self.write_cr()
         self._write_end_osc()
 
-
     def set_version(self):
         self.set_vars({"ShellIntegrationVersion": str(self.version), "shell": "xonsh"})
-
 
     def write_prompt_start_osc(self):
         self.write_osc("133;A")
         return ""
 
-
     def write_prompt_end_osc(self):
         self.write_osc("133;B")
         return ""
 
+    def write_preexec_osc(self):
+        self.write_osc("133;C;", cr=True)
+
+    def write_return_code_osc(self, return_code):
+        self.write_osc(f"133;D;{return_code}")
+
+
+    # Events
 
     def _event_pre_prompt(self, **kwargs):
         self.set_state()
 
+    def _event_pre_command(self, **kwargs):
+        self.write_preexec_osc()
+
+    def _event_post_command(self, **kwargs):
+        self.write_return_code_osc(kwargs.get('rtn', 0))
 
     def add_iterm2_to_events(self):
-        # TODO: @events.on_precommand  # https://xon.sh/events.html
 
         @events.on_pre_prompt
         def _iterm2_on_preprompt(**kwargs):
             self._event_pre_prompt(**kwargs)
 
-        # TODO: @events.on_post_prompt  # https://xon.sh/events.html
+        @events.on_precommand
+        def _iterm2_on_precommand(**kwargs):
+            self._event_pre_command(**kwargs)
+
+        @events.on_postcommand
+        def _iterm2_on_postcommand(**kwargs):
+            self._event_post_command(**kwargs)
+
+
 
 
     def add_iterm2_to_prompt(self):
