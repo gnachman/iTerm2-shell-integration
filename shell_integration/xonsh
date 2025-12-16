@@ -39,8 +39,26 @@ class _iTerm2Xonsh:
             and @.env.get('TERM','') not in ['linux', 'dumb']
         )
 
+    def _get_hostname(self):
+        if (iterm2_hostname := @.env.get('iterm2_hostname', '')):
+            return iterm2_hostname
+
+        try:
+            if (host := $(hostname -f 2> /dev/null)):
+                return host
+        except Exception:
+            pass
+
+        try:
+            if (host := $(hostname 2> /dev/null)):
+                return host
+        except Exception:
+            pass
+
+        return @.env.get('HOSTNAME', '')
+
     def set_state(self):
-        if (user := @.env.get('USER', '')) and (host := @.env.get('HOSTNAME', '')):
+        if (user := @.env.get('USER', '')) and (host := self._get_hostname()):
             self.set_var("RemoteHost", f"{user}@{host}")
 
         if (cwd := @.env.get("PWD", @.imp.os.getcwd())):
