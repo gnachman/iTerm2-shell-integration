@@ -20,8 +20,7 @@ class _iTerm2Xonsh:
         self.version = 1
         self.stdout = @.imp.sys.__stdout__
 
-        if @.env.get('ITERM2_INTEGRATION_PROMPT', True):
-            self.add_iterm2_to_prompt()
+        self.add_iterm2_to_prompt()
 
         if @.env.get('ITERM2_INTEGRATION_EVENTS', True):
             self.add_iterm2_to_events()
