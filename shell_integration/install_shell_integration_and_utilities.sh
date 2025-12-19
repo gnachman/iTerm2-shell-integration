@@ -56,24 +56,14 @@ then
   fi
   SCRIPT="${DOTDIR}/.zshrc"
   QUOTE='"'
-  ALIASES_ARRAY=()
-  for U in "${UTILITIES[@]}"
-  do
-    ALIASES_ARRAY+=("alias $U=$HOME_PREFIX/.iterm2/$U")
-  done
-  ALIASES=$(join "; " "${ALIASES_ARRAY[@]}")
+  PATH_LINE="export PATH=\"$HOME_PREFIX/.iterm2:\$PATH\""
 fi
 if [ "${SHELL}" = bash ]
 then
   URL="https://iterm2.com/shell_integration/bash"
   test -f "${HOME}/.bash_profile" && SCRIPT="${HOME}/.bash_profile" || SCRIPT="${HOME}/.profile"
   QUOTE='"'
-  ALIASES_ARRAY=()
-  for U in "${UTILITIES[@]}"
-  do
-    ALIASES_ARRAY+=("alias $U=~/.iterm2/$U")
-  done
-  ALIASES=$(join "; " "${ALIASES_ARRAY[@]}")
+  PATH_LINE='export PATH="$HOME/.iterm2:$PATH"'
 fi
 if [ "${SHELL}" = fish ]
 then
@@ -119,8 +109,9 @@ do
   echo "Downloading $U..."
   curl -SsL "https://iterm2.com/utilities/$U" > "$DOTDIR/.iterm2/$U" && chmod +x "$DOTDIR/.iterm2/$U"
 done
-echo "Adding aliases..."
+echo "Configuring utilities..."
 echo "$ALIASES" >> "${FILENAME}"
+test -n "$PATH_LINE" && echo "$PATH_LINE" >> "${FILENAME}"
 echo ""
 echo "--------------------------------------------------------------------------------"
 echo ""
@@ -128,7 +119,7 @@ echo "Done."
 echo "iTerm2 shell integration was installed!"
 echo ""
 echo "A script was installed to ${FILENAME}"
-echo "Utilities were installed to ${DOTDIR}/.iterm2. You don't need to modify your PATH because ${FILENAME} includes aliases for them."
+echo "Utilities were installed to ${DOTDIR}/.iterm2 and configured in ${FILENAME}."
 echo ""
 echo "To make it work right now, do:"
 echo "  source ${FILENAME}"
