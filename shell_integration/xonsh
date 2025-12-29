@@ -22,7 +22,10 @@ class _iTerm2Xonsh:
 
         self.add_iterm2_to_prompt()
 
-        if @.env.get('ITERM2_INTEGRATION_EVENTS', True):
+        @.env.register('ITERM2_INTEGRATION_EVENTS', type='bool', default=True,
+                       doc="Use `False` to disable iTerm2 integration events and have basic prompt integration. "
+                           "Default `True`.")
+        if @.env.get('ITERM2_INTEGRATION_EVENTS'):
             self.add_iterm2_to_events()
 
         self.set_state()
