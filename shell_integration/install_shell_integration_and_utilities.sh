@@ -101,13 +101,7 @@ then
   SCRIPT="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
   HOME_PREFIX='{$HOME}'
   QUOTE='"'
-
-  ALIASES_ARRAY=()
-  for U in "${UTILITIES[@]}"
-  do
-    ALIASES_ARRAY+=("aliases['${U}'] = '~/.iterm2/${U}'")
-  done
-  ALIASES=$(join $'\n' "${ALIASES_ARRAY[@]}")
+  PATH_LINE="\$PATH.insert(0, \"$HOME_PREFIX/.iterm2\"")
 fi
 if [ "${URL}" = "" ]
 then
