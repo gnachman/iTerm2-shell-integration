@@ -20,29 +20,27 @@ class _iTerm2Xonsh:
         self.version = 1
         self.stdout = @.imp.sys.__stdout__
 
-        self.add_iterm2_to_prompt()
-
-        @.env.register('ITERM2_INTEGRATION_EVENTS', type='bool', default=True,
-                       doc="Use `False` to disable iTerm2 integration events and have basic prompt integration. "
-                           "Default `True`.")
-        if @.env.get('ITERM2_INTEGRATION_EVENTS'):
+        self.add_iterm2_to_env()
+        if self.is_iterm2_interactive():
+            self.add_iterm2_to_prompt_fields()
             self.add_iterm2_to_events()
 
-        self.set_state()
-        self.set_version()
+            self.set_state()
+            self.set_version()
+        else:
+            $ITERM2_INTEGRATION = False
 
-        $ITERM2_INTEGRATION = True
 
-    @staticmethod
-    def is_iterm2_interactive():
-        return (
-            'iTerm' in @.env.get('TERM_PROGRAM', '')
-            and @.env.get('XONSH_INTERACTIVE', False)
-            and @.env.get('TERM','') not in ['linux', 'dumb']
-        )
+    def add_iterm2_to_env(self):
+        @.env.register('ITERM2_INTEGRATION', type='bool', default=True,
+                       doc="Has `True` if iTerm2 integration was enabled or `False` overwise.")
+        @.env.register('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX', type='bool', default=False,
+                       doc="By default, shell Integration does not work with tmux or screen. "
+                           "If you'd like to use it with tmux, set `True`. "
+                           "Docs: https://iterm2.com/documentation-shell-integration.html")
 
-    @staticmethod
-    def is_iterm2_interactive():
+
+    def is_iterm2_interactive(self):
         term = @.env.get('TERM', '')
         term_program = @.env.get('TERM_PROGRAM', '')
         interactive = @.env.get('XONSH_INTERACTIVE', False)
@@ -50,7 +48,7 @@ class _iTerm2Xonsh:
         if term in ('linux', 'dumb'):
             return False
 
-        tmux_enabled = bool(@.env.get('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX'))
+        tmux_enabled = @.env.get('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX')
         if not tmux_enabled and term in ('screen', 'screen-256color', 'tmux-256color'):
             return False
 
@@ -129,10 +127,21 @@ class _iTerm2Xonsh:
     def write_return_code_osc(self, return_code):
         self.write_osc(f"133;D;{return_code}")
 
+    # Integrations
+
+    def add_iterm2_to_prompt_fields(self):
+        $PROMPT_FIELDS['iterm2_prompt_start'] = self.write_prompt_start_osc
+        $PROMPT_FIELDS['iterm2_prompt_end'] = self.write_prompt_end_osc
+
+    def add_iterm2_to_prompt(self):
+        if 'iterm2_prompt_start' not in $PROMPT:
+            $PROMPT = '{iterm2_prompt_start}' + $PROMPT + '{iterm2_prompt_end}'
+
 
     # Events
 
     def _event_pre_prompt(self, **kwargs):
+        self.add_iterm2_to_prompt()
         self.set_state()
 
     def _event_pre_command(self, **kwargs):
@@ -155,12 +164,5 @@ class _iTerm2Xonsh:
         def _iterm2_on_postcommand(**kwargs):
             self._event_post_command(**kwargs)
 
-    def add_iterm2_to_prompt(self):
-        $PROMPT_FIELDS['iterm2_prompt_start'] = self.write_prompt_start_osc
-        $PROMPT_FIELDS['iterm2_prompt_end'] = self.write_prompt_end_osc
-        if 'iterm2_prompt_start' not in $PROMPT:
-            $PROMPT = '{iterm2_prompt_start}' + $PROMPT + '{iterm2_prompt_end}'
 
-
-if _iTerm2Xonsh.is_iterm2_interactive():
-    __xonsh__.iterm2 = _iTerm2Xonsh()
+__xonsh__.iterm2 = _iTerm2Xonsh()
