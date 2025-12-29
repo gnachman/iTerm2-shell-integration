@@ -92,8 +92,13 @@ fi
 if [ "${SHELL}" = xonsh ]
 then
   URL="https://iterm2.com/shell_integration/xonsh"
-  mkdir -p "${HOME}/.config/xonsh/rc.d/"
-  SCRIPT="${HOME}/.config/xonsh/rc.d/iterm2.xsh"
+  if [ -n "${XDG_CONFIG_HOME}" ]; then
+    CONFIG_HOME="${XDG_CONFIG_HOME}"
+  else
+    CONFIG_HOME="${HOME}/.config"
+  fi
+  mkdir -p "${CONFIG_HOME}/xonsh/rc.d/"
+  SCRIPT="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
   HOME_PREFIX='{$HOME}'
   QUOTE='"'
 
