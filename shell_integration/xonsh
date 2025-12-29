@@ -155,9 +155,6 @@ class _iTerm2Xonsh:
         def _iterm2_on_postcommand(**kwargs):
             self._event_post_command(**kwargs)
 
-
-
-
     def add_iterm2_to_prompt(self):
         $PROMPT_FIELDS['iterm2_prompt_start'] = self.write_prompt_start_osc
         $PROMPT_FIELDS['iterm2_prompt_end'] = self.write_prompt_end_osc
