@@ -150,7 +150,7 @@ class _iTerm2Xonsh:
         $PROMPT_FIELDS['iterm2_prompt_end'] = "\001" + "\033]133;B\a" + "\002"
 
     def add_iterm2_to_prompt(self):
-        if 'iterm2_prompt_start' not in $PROMPT:
+        if isinstance($PROMPT, str) and 'iterm2_prompt_start' not in $PROMPT:
             $PROMPT = '{iterm2_prompt_start}' + $PROMPT + '{iterm2_prompt_end}'
 
 
