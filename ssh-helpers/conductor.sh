@@ -45,6 +45,9 @@ print_dcs() {
     local sshargs=$4
     log osc print_dcs $1 $2 $3 $4
 
+    # Use placeholder if token is empty to avoid parsing issues from leading space
+    [ -z "$token" ] && token="none"
+
     printf "\033P2000p"
     printf "%s %s %s - %s\n" "${token}" "${uniqueid}" "${boolargs}" "${sshargs}"
 }
