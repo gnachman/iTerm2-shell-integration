@@ -28,7 +28,14 @@ function join {
 type printf > /dev/null 2>&1 || die "Shell integration requires the printf binary to be in your path."
 
 UTILITIES=(imgcat imgls it2api it2attention it2check it2copy it2dl it2getvar it2git it2setcolor it2setkeylabel it2tip it2ul it2universion it2profile it2cat)
-SHELL=${SHELL##*/}
+
+# Non-POSIX shells may leave POSIX shell path in the $SHELL; perform an additional check.
+if [ -n "${XONSHRC}" ]; then
+  SHELL=xonsh
+else
+  SHELL=${SHELL##*/}
+fi
+
 URL=""
 HOME_PREFIX='${HOME}'
 DOTDIR="$HOME"
@@ -82,9 +89,23 @@ then
   done
   ALIASES=$(join "; " "${ALIASES_ARRAY[@]}")
 fi
+if [ "${SHELL}" = xonsh ]
+then
+  URL="https://iterm2.com/shell_integration/xonsh"
+  if [ -n "${XDG_CONFIG_HOME}" ]; then
+    CONFIG_HOME="${XDG_CONFIG_HOME}"
+  else
+    CONFIG_HOME="${HOME}/.config"
+  fi
+  mkdir -p "${CONFIG_HOME}/xonsh/rc.d/"
+  SCRIPT="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
+  HOME_PREFIX='{$HOME}'
+  QUOTE='"'
+  PATH_LINE="\$PATH.insert(0, \"$HOME_PREFIX/.iterm2\"")
+fi
 if [ "${URL}" = "" ]
 then
-  die "Your shell, ${SHELL}, is not supported yet. Only tcsh, zsh, bash, and fish are supported. Sorry!"
+  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, tcsh, xonsh and zsh are supported. Sorry!"
   exit 1
 fi
 
