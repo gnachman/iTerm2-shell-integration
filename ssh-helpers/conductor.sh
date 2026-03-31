@@ -447,6 +447,7 @@ iterate() {
         if [ -z "$part" ]; then
             break
         fi
+        part="${part#"$line_prefix"}"
         line="${line}${part}"
     done
 
@@ -487,6 +488,12 @@ main() {
     drain_stdin
     stty -echo -onlcr -opost
     print_dcs "$token" "$uniqueid" "$booleanargs" "$sshargs"
+
+    # Read the random line prefix sent by iTerm2. This prefix is prepended to
+    # each pre-framer command line to prevent an attacker from planting
+    # executables matching the base64 strings we receive.
+    read line_prefix
+    log "line_prefix: $line_prefix"
 
     log begin mainloop
 
