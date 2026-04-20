@@ -243,7 +243,7 @@ conductor_cmd_pythonversion() {
     log conductor_cmd_pythonversion
     printf "\033]135;:"
     command -v python3 >/dev/null 2>&1 && python3 -V
-    printf "\033\\"
+    printf '\033\134'
 }
 
 conductor_cmd_runpython() {
@@ -301,7 +301,7 @@ conductor_cmd_shell() {
     set +e
     log will run $*
     $*
-    printf "\033\\"
+    printf '\033\134'
 }
 
 # Untar a base64-encoded file at a specified location.
@@ -358,8 +358,8 @@ conductor_cmd_getshell() {
     shell=$(guess_login_shell)
     echo "$shell"
     echo ~
-    $shell --version || true
-    printf "\033\\"
+    $shell --version 2>/dev/null || true
+    printf '\033\134'
 }
 
 conductor_cmd_eval() {
@@ -376,7 +376,7 @@ conductor_cmd_eval() {
 }
 
 write() {
-    printf "\033]135;:%s\033\\" "$*"
+    printf '\033]135;:%s\033\134' "$*"
 }
 
 # Main Loop
@@ -486,7 +486,8 @@ main() {
 
     trap "cleanup" EXIT
     drain_stdin
-    stty -echo -onlcr -opost
+    # Ignore signals because iTerm2 will send ^C as a security measure.
+    stty -echo -onlcr -opost -isig
     print_dcs "$token" "$uniqueid" "$booleanargs" "$sshargs"
 
     # Read the random line prefix sent by iTerm2. This prefix is prepended to
