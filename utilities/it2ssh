@@ -43,9 +43,13 @@ eval_cmd=\''eval "$(echo "$0")"'\'
 SSH=${SSH:-/usr/bin/ssh}
 if [[ "$OSTYPE" == "darwin"* ]]; then
   TOKEN=""
-  for SOCKET in ~/.config/iterm2/sockets/secrets ~/.iterm2/sockets/secrets ~/.iterm2-1/sockets/secrets
+  SOCKETS=(~/.config/iterm2/sockets/secrets ~/.iterm2/sockets/secrets ~/.iterm2-1/sockets/secrets)
+  if [ -n "${IT2_SUITE:-}" ]; then
+      SOCKETS=("$HOME/.config/$IT2_SUITE/sockets/secrets" "${SOCKETS[@]}")
+  fi
+  for SOCKET in "${SOCKETS[@]}"
   do
-      [ -z "$TOKEN" ] && TOKEN=$(/usr/bin/nc -U $SOCKET || true)
+      [ -z "$TOKEN" ] && TOKEN=$(/usr/bin/nc -U "$SOCKET" || true)
   done
 else
   TOKEN="none"
