@@ -22,7 +22,7 @@ function iterm2_end_osc {
 }
 
 function iterm2_print_state_data() {
-  local _iterm2_hostname="${iterm2_hostname}"
+  local _iterm2_hostname="${iterm2_hostname-}"
   if [ -z "${iterm2_hostname:-}" ]; then
     _iterm2_hostname=$(hostname -f 2>/dev/null)
   fi
@@ -66,6 +66,15 @@ function iterm2_prompt_mark() {
   iterm2_end_osc
 }
 
+# Semantic Prompt k=s — non-editable secondary (PS2). Used to wrap PS2 so the
+# receiver can subtract the PS2 prefix cells from the typed-command region and
+# so paste-helpers can advance past PS2 lines (issue 5749).
+function iterm2_ps2_mark() {
+  iterm2_begin_osc
+  printf "133;A;k=s"
+  iterm2_end_osc
+}
+
 function iterm2_prompt_suffix() {
   iterm2_begin_osc
   printf "133;B"
@@ -74,7 +83,7 @@ function iterm2_prompt_suffix() {
 
 function iterm2_print_version_number() {
   iterm2_begin_osc
-  printf "1337;ShellIntegrationVersion=18;shell=bash"
+  printf "1337;ShellIntegrationVersion=19;shell=bash"
   iterm2_end_osc
 }
 
@@ -113,6 +122,13 @@ __iterm2_preexec() {
     then
       export PS1="$ITERM_ORIG_PS1"
     fi
+    # Same dance for PS2: restore the un-decorated value so the user's command
+    # doesn't see our escape sequences (and so the next prompt cycle re-wraps a
+    # clean PS2). Bail if the user changed PS2 mid-command.
+    if [ -n "${ITERM_ORIG_PS2+1}" -a "$PS2" = "$ITERM_PREV_PS2" ]
+    then
+      export PS2="$ITERM_ORIG_PS2"
+    fi
     iterm2_ran_preexec="yes"
     # preexec functions can return nonzero to prevent user's command from running.
     return 0
@@ -127,6 +143,7 @@ function __iterm2_prompt_command () {
     then
         # This code path is taken when you press ^C while entering a command.
         # I observed this behavior in CentOS 7.2 and macOS "GNU bash, version 5.0.18(1)-release".
+        ( exit $__iterm2_last_ret_value )
         __iterm2_preexec ""
         __bp_set_ret_value "$__iterm2_last_ret_value" "$__bp_last_argument_prev_command"
     fi
@@ -179,11 +196,24 @@ function __iterm2_prompt_command () {
       export ITERM_ORIG_PS1="$PS1"
     fi
 
+    # PS2 parallel of the PS1 dance above. First time through ITERM_ORIG_PS2 is
+    # unset, so capture the user's PS2 (which may be the shell default "> ").
+    # On subsequent cycles, if PS2 differs from what we last wrote, the user
+    # (or another precmd) changed it and we re-capture.
+    if [ -z "${ITERM_ORIG_PS2+1}" ]
+    then
+      export ITERM_ORIG_PS2="$PS2"
+    fi
+    if [[ "$PS2" != "${ITERM_PREV_PS2-}" ]]
+    then
+      export ITERM_ORIG_PS2="$PS2"
+    fi
+
     # Get the value of the prompt prefix, which will change $?
     \local iterm2_prompt_prefix_value="$(iterm2_prompt_prefix)"
 
     # Add the mark unless the prompt includes '$(iterm2_prompt_mark)' as a substring.
-    if [[ $ITERM_ORIG_PS1 != *'$(iterm2_prompt_mark)'* && x$ITERM2_SQUELCH_MARK = x ]]
+    if [[ $ITERM_ORIG_PS1 != *'$(iterm2_prompt_mark)'* && x${ITERM2_SQUELCH_MARK-} = x ]]
     then
       iterm2_prompt_prefix_value="$iterm2_prompt_prefix_value$(iterm2_prompt_mark)"
     fi
@@ -197,8 +227,19 @@ function __iterm2_prompt_command () {
     # Set PS1 to various escape sequences, the user's preferred prompt, and more escape sequences.
     export PS1="\[$iterm2_prompt_prefix_value\]$ITERM_ORIG_PS1\[$(iterm2_prompt_suffix)\]"
 
-    # Save the value we just set PS1 to so if the user changes PS1 we'll know and we can update ITERM_ORIG_PS1.
+    # Wrap PS2 with k=s (Semantic Prompt secondary). Receiver records the PS2
+    # prefix cells as an excluded subrange on the active primary mark and uses
+    # the marker to unblock Advanced Paste's "Wait for shell prompt" between
+    # continuation lines (issue 5749). Opt out with ITERM2_SQUELCH_PS2_MARK.
+    if [[ x${ITERM2_SQUELCH_PS2_MARK-} = x ]]
+    then
+      export PS2="\[$(iterm2_ps2_mark)\]$ITERM_ORIG_PS2\[$(iterm2_prompt_suffix)\]"
+    fi
+
+    # Save the value we just set PS1/PS2 to so if the user changes them later
+    # we'll detect it and refresh ITERM_ORIG_*.
     export ITERM_PREV_PS1="$PS1"
+    export ITERM_PREV_PS2="$PS2"
     __bp_set_ret_value "$__iterm2_last_ret_value" "$__bp_last_argument_prev_command"
 }
 

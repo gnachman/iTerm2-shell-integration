@@ -43,7 +43,7 @@ SHELL_AND='&&'
 QUOTE=''
 if [ "${SHELL}" = tcsh ]
 then
-  URL="https://iterm2.com/shell_integration/tcsh"
+  URL="https://iterm2.com/shell_integration/v2/tcsh"
   SCRIPT="${HOME}/.login"
   QUOTE='"'
   ALIASES_ARRAY=()
@@ -55,7 +55,7 @@ then
 fi
 if [ "${SHELL}" = zsh ]
 then
-  URL="https://iterm2.com/shell_integration/zsh"
+  URL="https://iterm2.com/shell_integration/v2/zsh"
   if [ -d "$ZDOTDIR" -a ! -f "${HOME}/.iterm2_shell_integration.${SHELL}" ]; then
     echo "Using ZDOTDIR of $ZDOTDIR"
     DOTDIR="$ZDOTDIR"
@@ -67,7 +67,7 @@ then
 fi
 if [ "${SHELL}" = bash ]
 then
-  URL="https://iterm2.com/shell_integration/bash"
+  URL="https://iterm2.com/shell_integration/v2/bash"
   test -f "${HOME}/.bash_profile" && SCRIPT="${HOME}/.bash_profile" || SCRIPT="${HOME}/.profile"
   QUOTE='"'
   PATH_LINE='export PATH="$HOME/.iterm2:$PATH"'
@@ -77,7 +77,7 @@ then
   echo "Make sure you have fish 2.3 or later. Your version is:"
   fish -v
 
-  URL="https://iterm2.com/shell_integration/fish"
+  URL="https://iterm2.com/shell_integration/v2/fish"
   mkdir -p "${HOME}/.config/fish"
   SCRIPT="${HOME}/.config/fish/config.fish"
   HOME_PREFIX='{$HOME}'
@@ -91,7 +91,7 @@ then
 fi
 if [ "${SHELL}" = xonsh ]
 then
-  URL="https://iterm2.com/shell_integration/xonsh"
+  URL="https://iterm2.com/shell_integration/v2/xonsh"
   if [ -n "${XDG_CONFIG_HOME}" ]; then
     CONFIG_HOME="${XDG_CONFIG_HOME}"
   else

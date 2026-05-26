@@ -64,15 +64,6 @@ if [[ -o interactive ]]; then
       printf "\033]133;A\007"
     }
 
-    # Mark start of a PS2 continuation prompt (Semantic Prompt k=s — non-editable
-    # secondary). Receiver-side (iTerm2 r600+) treats this as a non-mark-creating
-    # signal that paste-helpers can use to advance past PS2 lines (issue 5749) and
-    # that records the PS2 prefix cells as an excluded subrange on the active
-    # primary mark, so selection / share / AI consumers can subtract them.
-    iterm2_ps2_mark() {
-      printf "\033]133;A;k=s\007"
-    }
-
     # Mark end of prompt
     iterm2_prompt_end() {
       printf "\033]133;B\007"
@@ -120,7 +111,6 @@ if [[ -o interactive ]]; then
       # This should be a raw PS1 without iTerm2's stuff. It could be changed during command
       # execution.
       ITERM2_PRECMD_PS1="$PS1"
-      ITERM2_PRECMD_PS2="$PS2"
       ITERM2_SHOULD_DECORATE_PROMPT=""
 
       # Add our escape sequences just before the prompt is shown.
@@ -136,17 +126,6 @@ if [[ -o interactive ]]; then
       fi
       PS1="$PREFIX$PS1%{$(iterm2_prompt_end)%}"
       ITERM2_DECORATED_PS1="$PS1"
-
-      # Wrap PS2 with k=s so the receiver can subtract the PS2 prefix cells from
-      # the typed-command region and so paste-helpers can advance past PS2 lines.
-      # Skip if PS2 already contains our mark (user re-sourced this script) or if
-      # the user has opted out via ITERM2_SQUELCH_PS2_MARK. The wrap is idempotent
-      # in steady state because iterm2_preexec restores PS2 from
-      # ITERM2_PRECMD_PS2 before the next cycle.
-      if [[ $PS2 != *"$(iterm2_ps2_mark)"* ]] && [[ "${ITERM2_SQUELCH_PS2_MARK-}" == "" ]]; then
-        PS2="%{$(iterm2_ps2_mark)%}$PS2%{$(iterm2_prompt_end)%}"
-      fi
-      ITERM2_DECORATED_PS2="$PS2"
     }
 
     iterm2_precmd() {
@@ -169,9 +148,8 @@ if [[ -o interactive ]]; then
 
     # This is not run if you press ^C while entering a command.
     iterm2_preexec() {
-      # Set PS1 and PS2 back to their raw values prior to executing the command.
+      # Set PS1 back to its raw value prior to executing the command.
       PS1="$ITERM2_PRECMD_PS1"
-      PS2="$ITERM2_PRECMD_PS2"
       ITERM2_SHOULD_DECORATE_PROMPT="1"
       iterm2_before_cmd_executes
     }
@@ -197,6 +175,6 @@ if [[ -o interactive ]]; then
     preexec_functions=($preexec_functions iterm2_preexec)
 
     iterm2_print_state_data
-    printf "\033]1337;ShellIntegrationVersion=16;shell=zsh\007"
+    printf "\033]1337;ShellIntegrationVersion=15;shell=zsh\007"
   fi
 fi
