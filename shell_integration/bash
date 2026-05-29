@@ -716,15 +716,26 @@ if [ -z "$(type -t iterm2_print_user_vars)" ] || [ "$(type -t iterm2_print_user_
   }
 fi
 
+# OSC 133 aid: per-command identifier the receiver uses to target a
+# specific mark for D-by-aid (and cascade-close when an outer command
+# like ssh dies before its inner remote shell's D arrives). The salt is
+# rolled once at shell-source time; the counter increments per prompt
+# cycle in __iterm2_prompt_command.
+export ITERM2_AID_SALT="${RANDOM}${RANDOM}"
+export ITERM2_AID_COUNTER=0
+# Pre-seeded so emissions before the first __iterm2_prompt_command have a
+# defined aid value rather than the empty string.
+export ITERM2_CURRENT_AID="${ITERM2_AID_SALT}-0"
+
 function iterm2_prompt_prefix() {
   iterm2_begin_osc
-  printf "133;D;\$?"
+  printf "133;D;\$?;aid=%s" "$ITERM2_CURRENT_AID"
   iterm2_end_osc
 }
 
 function iterm2_prompt_mark() {
   iterm2_begin_osc
-  printf "133;A"
+  printf "133;A;aid=%s" "$ITERM2_CURRENT_AID"
   iterm2_end_osc
 }
 
@@ -733,19 +744,19 @@ function iterm2_prompt_mark() {
 # so paste-helpers can advance past PS2 lines (issue 5749).
 function iterm2_ps2_mark() {
   iterm2_begin_osc
-  printf "133;A;k=s"
+  printf "133;A;k=s;aid=%s" "$ITERM2_CURRENT_AID"
   iterm2_end_osc
 }
 
 function iterm2_prompt_suffix() {
   iterm2_begin_osc
-  printf "133;B"
+  printf "133;B;aid=%s" "$ITERM2_CURRENT_AID"
   iterm2_end_osc
 }
 
 function iterm2_print_version_number() {
   iterm2_begin_osc
-  printf "1337;ShellIntegrationVersion=19;shell=bash"
+  printf "1337;ShellIntegrationVersion=20;shell=bash"
   iterm2_end_osc
 }
 
@@ -774,7 +785,7 @@ __iterm2_preexec() {
     __iterm2_last_ret_value="$?"
 
     iterm2_begin_osc
-    printf "133;C;"
+    printf "133;C;aid=%s" "$ITERM2_CURRENT_AID"
     iterm2_maybe_print_cr
     iterm2_end_osc
     # If PS1 still has the value we set it to in iterm2_preexec_invoke_cmd then
@@ -873,6 +884,13 @@ function __iterm2_prompt_command () {
 
     # Get the value of the prompt prefix, which will change $?
     \local iterm2_prompt_prefix_value="$(iterm2_prompt_prefix)"
+
+    # Roll the per-command aid AFTER D for the previous command has been
+    # captured (above) and BEFORE A/B for the new command get captured
+    # below. The just-finished command's A/B/C/D all share the OLD aid;
+    # the upcoming command's A/B/C/D all share the NEW one.
+    ITERM2_AID_COUNTER=$((ITERM2_AID_COUNTER + 1))
+    ITERM2_CURRENT_AID="${ITERM2_AID_SALT}-${ITERM2_AID_COUNTER}"
 
     # Add the mark unless the prompt includes '$(iterm2_prompt_mark)' as a substring.
     if [[ $ITERM_ORIG_PS1 != *'$(iterm2_prompt_mark)'* && x${ITERM2_SQUELCH_MARK-} = x ]]
