@@ -318,13 +318,7 @@ __bp_precmd_invoke_cmd() {
     # prompt command" by another precmd execution loop. This avoids infinite
     # recursion.
     if (( __bp_inside_precmd > 0 )); then
-        # Preserve $? and $_ across the early return: without this, the
-        # bare `return` propagates the exit status of the `(( ... ))` test
-        # (always 0 when the condition is true), clobbering the value the
-        # user code is about to inspect in PROMPT_COMMAND-time prompt
-        # substitutions.
-        __bp_set_ret_value "$__bp_last_ret_value" "$__bp_last_argument_prev_command"
-        return
+        return "$__bp_last_ret_value"
     fi
 
     # Check and adjust PROMPT_COMMAND to make sure that PROMPT_COMMAND has the
@@ -337,13 +331,7 @@ __bp_precmd_invoke_cmd() {
             # (e.g., starship). In this case, we do not need to invoke precmd
             # because it is supposed to be already processed by the top-level
             # __bp_precmd_invoke_cmd.
-            #
-            # Preserve $? and $_ instead of forcing them to 0 — same reasoning
-            # as the early-return branch above; the top-level call will run
-            # the user's precmd_functions, and they expect to see the real
-            # last-command exit status.
-            __bp_set_ret_value "$__bp_last_ret_value" "$__bp_last_argument_prev_command"
-            return
+            return "$__bp_last_ret_value"
         fi
     fi
 
