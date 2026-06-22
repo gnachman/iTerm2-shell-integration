@@ -19,7 +19,7 @@ stty_settings=$(command stty -g)
 cleanup() {
   log cleanup "$stty_settings"
   command stty "$stty_settings"
-  command stty echo
+  command stty echo isig
 }
 
 die() {
