@@ -271,3 +271,18 @@ fi
 # -- END ITERM2 CUSTOMIZATIONS --
 
 
+
+# it2 CLI over iTerm2 SSH integration: unless it2 already exists, define it as a
+# function that materializes the embedded copy on first use (named by content hash,
+# so a shipped update replaces a stale one). Needs python3; it2.py reads
+# IT2_SOCK/IT2_NONCE from the environment set by SSH integration.
+if ! command -v it2 > /dev/null 2>&1; then
+  it2() {
+    command -v python3 > /dev/null 2>&1 || { printf 'it2: python3 is required\n' >&2; return 1; }
+    if [ ! -f "${HOME}/.iterm2/it2.${IT2_PY_HASH}.py" ]; then
+      python3 -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' "${IT2_PY_B64}" "${HOME}/.iterm2/it2.${IT2_PY_HASH}.py" || return 1
+    fi
+    command python3 "${HOME}/.iterm2/it2.${IT2_PY_HASH}.py" "$@"
+  }
+  export -f it2 2> /dev/null
+fi

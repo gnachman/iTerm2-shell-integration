@@ -1,9 +1,6 @@
 [submodule "submodules/bash-preexec"]
 	path = submodules/bash-preexec
-	# TEMPORARY: points at gnachman/bash-preexec to host the
-	# fix/preserve-exit-status-on-early-returns branch (commit 70548af)
-	# that has the issue 11016 fix for both __bp_precmd_invoke_cmd
-	# early-return paths. Upstream PR is in flight against rcaloras;
-	# revert this URL back to https://github.com/rcaloras/bash-preexec
-	# and re-pin to upstream master once that PR merges.
-	url = https://github.com/gnachman/bash-preexec
+	# The issue-11016 fix (preserve exit status on __bp_precmd_invoke_cmd early
+	# returns, PR #187) merged upstream, so this is back on rcaloras and pinned to
+	# upstream master.
+	url = https://github.com/rcaloras/bash-preexec
