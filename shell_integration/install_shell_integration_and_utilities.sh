@@ -41,6 +41,9 @@ HOME_PREFIX='${HOME}'
 DOTDIR="$HOME"
 SHELL_AND='&&'
 QUOTE=''
+# Set by shells that load the script from a directory instead of from a dotfile.
+FILENAME_OVERRIDE=''
+NO_DOTFILE=''
 if [ "${SHELL}" = tcsh ]
 then
   URL="https://iterm2.com/shell_integration/v2/tcsh"
@@ -103,25 +106,42 @@ then
   QUOTE='"'
   PATH_LINE="\$PATH.insert(0, \"$HOME_PREFIX/.iterm2\")"
 fi
+if [ "${SHELL}" = nu ]
+then
+  URL="https://iterm2.com/shell_integration/v2/nu"
+  # nushell sources every .nu file in its user autoload directory at startup,
+  # and does so after config.nu, so there is no dotfile to edit -- dropping the
+  # script in place is the whole installation. Ask nu where that directory is
+  # rather than guessing: it is under ~/Library/Application Support on macOS and
+  # ~/.config on Linux.
+  NU_CONFIG_DIR=$(nu --no-config-file -c 'print $nu.default-config-dir' 2>/dev/null)
+  test -n "${NU_CONFIG_DIR}" || NU_CONFIG_DIR="${HOME}/.config/nushell"
+  mkdir -p "${NU_CONFIG_DIR}/autoload"
+  FILENAME_OVERRIDE="${NU_CONFIG_DIR}/autoload/iterm2_shell_integration.nu"
+  NO_DOTFILE=1
+  PATH_LINE='$env.PATH = ($env.PATH | prepend ($env.HOME | path join ".iterm2"))'
+fi
 if [ "${URL}" = "" ]
 then
-  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, tcsh, xonsh and zsh are supported. Sorry!"
+  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, nu, tcsh, xonsh and zsh are supported. Sorry!"
   exit 1
 fi
 
-FILENAME="${DOTDIR}/.iterm2_shell_integration.${SHELL}"
+FILENAME="${FILENAME_OVERRIDE:-${DOTDIR}/.iterm2_shell_integration.${SHELL}}"
 RELATIVE_FILENAME="${HOME_PREFIX}/.iterm2_shell_integration.${SHELL}"
 echo "Downloading script from ${URL} and saving it to ${FILENAME}..."
 curl -SsL "${URL}" > "${FILENAME}" || die "Couldn't download script from ${URL}"
 chmod +x "${FILENAME}"
-echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
-if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
+  if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
 	echo "Appending source command to ${SCRIPT}..."
 	cat <<-EOF >> "${SCRIPT}"
 
 	test -e ${QUOTE}${RELATIVE_FILENAME}${QUOTE} ${SHELL_AND} source ${QUOTE}${RELATIVE_FILENAME}${QUOTE}
 
 EOF
+  fi
 fi
 
 test -d "$DOTDIR/.iterm2" || mkdir "$DOTDIR/.iterm2"
@@ -145,7 +165,11 @@ echo ""
 echo "To make it work right now, do:"
 echo "  source ${FILENAME}"
 echo
-echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+else
+  echo "It went into a directory ${SHELL} loads at startup, so the next time you log in it will be loaded automatically."
+fi
 echo ""
 echo "--------------------------------------------------------------------------------"
 echo ""
