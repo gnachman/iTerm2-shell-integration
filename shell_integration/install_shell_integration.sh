@@ -94,7 +94,27 @@ then
   # rather than guessing: it is under ~/Library/Application Support on macOS and
   # ~/.config on Linux.
   NU_CONFIG_DIR=$(nu --no-config-file -c 'print $nu.default-config-dir' 2>/dev/null)
-  test -n "${NU_CONFIG_DIR}" || NU_CONFIG_DIR="${HOME}/.config/nushell"
+  if [ -z "${NU_CONFIG_DIR}" ]; then
+    # Only reached when nu itself cannot be run. nushell honors XDG_CONFIG_HOME
+    # on every platform, but only when it is an absolute path -- that
+    # requirement came in with XDG support in 0.92. Otherwise it uses the
+    # platform config directory, which on macOS is ~/Library/Application
+    # Support, not ~/.config.
+    NU_UNAME=$(uname 2>/dev/null) || NU_UNAME=""
+    case "${XDG_CONFIG_HOME:-}" in
+      /*)
+        NU_CONFIG_DIR="${XDG_CONFIG_HOME}/nushell"
+        ;;
+      *)
+        if [ "${NU_UNAME}" = Darwin ]; then
+          NU_CONFIG_DIR="${HOME}/Library/Application Support/nushell"
+        else
+          # Also covers uname being absent or failing.
+          NU_CONFIG_DIR="${HOME}/.config/nushell"
+        fi
+        ;;
+    esac
+  fi
   mkdir -p "${NU_CONFIG_DIR}/autoload"
   FILENAME_OVERRIDE="${NU_CONFIG_DIR}/autoload/iterm2_shell_integration.nu"
   NO_DOTFILE=1
