@@ -104,19 +104,76 @@ def "iterm2 report-state" [] {
     }
 }
 
+# The pre_prompt hook is registered as a string rather than a closure,
+# so its exact text is also the sentinel that says this file has already
+# been sourced. The sentinel cannot go stale, because it *is* the hook:
+# if the hook is gone, so is the marker.
+#
+# String hooks are a documented hook form, not an introspection trick.
+# nu-cmd-base's eval_hook has parsed and evaluated Value::String hooks
+# since well before the 0.100 floor, and the Value::List branch recurses
+# into each element, so a string inside pre_prompt's list is exercised
+# code. The earlier approach -- reading closures back with `view source`
+# -- leaned on a debug command whose output the 0.101 release notes
+# explicitly tell scripts not to depend on, and which had already
+# changed format once in 0.93.
+#
+# Two consequences, both accepted deliberately:
+#
+#   * The string is parsed once per prompt. It is a single command call
+#     with no arguments, so the cost is a rounding error next to the
+#     `hostname` the hook already shells out to.
+#
+#   * The command name is resolved at each prompt rather than captured
+#     when the hook is registered, so a command that shadows or hides it
+#     would change what the hook does. Hence the deliberately private
+#     name below: "iterm2-shell-integration pre-prompt" is not something
+#     another tool or a user is likely to define by accident, and it is
+#     not part of the interface this script offers (that is
+#     `iterm2 set-user-var`).
+const iterm2_pre_prompt_hook = "iterm2-shell-integration pre-prompt"
+
+def "iterm2-shell-integration pre-prompt" [] {
+    iterm2 report-state
+}
+
+# Has this file already been sourced in this process?
+#
+# The other shells answer that with ITERM_SHELL_INTEGRATION_INSTALLED,
+# but they set it as a plain shell variable that child processes never
+# see. nushell has no such thing: everything in $env is handed to
+# externals, so writing it here would export it, and a bash or zsh
+# started from this shell would find it set and skip its own
+# integration entirely. So look for our own hook instead: it lives in
+# $env.config, which never leaves the process. A type check keeps the
+# comparison honest when a hook is a closure or a conditional record,
+# both of which pre_prompt also accepts.
+def "iterm2 hook-registered" [] {
+    ($env.config.hooks.pre_prompt? | default [])
+    | any {|hook|
+        ($hook | describe) == "string" and $hook == $iterm2_pre_prompt_hook
+    }
+}
+
 # Don't run in IDE terminals. TERM_PROGRAM is set by the local terminal
 # but not forwarded over SSH. LC_TERMINAL is set by iTerm2 and may be
 # forwarded over SSH. Shell integration does not work under tmux or
 # screen unless you opt in with
-# ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX. The
-# ITERM_SHELL_INTEGRATION_INSTALLED variable, which the scripts for the
-# other shells set too, keeps a second `source` of this file from
-# appending the pre_prompt hook a second time.
+# ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX.
+#
+# ITERM_SHELL_INTEGRATION_INSTALLED is read but never written. It is a
+# deliberate opt-out: someone who exports it is asking every shell to
+# skip its integration, and bash and zsh obey it the same way when it
+# reaches them through the environment. Do not "fix" this by clearing
+# or ignoring an inherited value -- that would defeat the opt-out. The
+# double-source problem it solves elsewhere is handled here by
+# iterm2 hook-registered, which needs no environment variable.
 let iterm2_term = ($env.TERM? | default "")
 let iterm2_term_program = ($env.TERM_PROGRAM? | default "")
 let iterm2_active = (
     $nu.is-interactive
     and ($env.ITERM_SHELL_INTEGRATION_INSTALLED? | default "") == ""
+    and (not (iterm2 hook-registered))
     and (
         $iterm2_term_program == ""
         or $iterm2_term_program == "iTerm.app"
@@ -129,17 +186,10 @@ let iterm2_active = (
     )
 )
 
-# Every $env mutation below happens at the top level of the file rather
-# than inside an `if` block, so there is no question about which scope
-# it lands in.
-$env.ITERM_SHELL_INTEGRATION_INSTALLED = (
-    if $iterm2_active {
-        "Yes"
-    } else {
-        $env.ITERM_SHELL_INTEGRATION_INSTALLED? | default ""
-    }
-)
-
+# The $env.config assignment happens at the top level of the file rather
+# than inside an `if` block, so there is no question about which scope it
+# lands in.
+#
 # pre_prompt must be a list from 0.101 on, and defaults to null on
 # 0.100, hence the `default []`.
 $env.config = (
@@ -148,7 +198,7 @@ $env.config = (
         | upsert shell_integration.osc133 true
         | upsert hooks.pre_prompt (
             ($env.config.hooks.pre_prompt? | default [])
-            | append {|| iterm2 report-state }
+            | append $iterm2_pre_prompt_hook
         )
     } else {
         $env.config
