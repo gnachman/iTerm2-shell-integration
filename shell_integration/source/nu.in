@@ -1,0 +1,249 @@
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+# iTerm2 shell integration for nushell (0.100 and later).
+#
+# Unlike bash/zsh/tcsh, nushell already speaks the OSC 133 semantic
+# prompt protocol itself. With $env.config.shell_integration.osc133 on --
+# the default in every version since 0.94 -- it emits A before the
+# prompt, B after it, C before running a command, and D with
+# $env.LAST_EXIT_CODE when the command finishes. Those marks are placed
+# by the line editor, which is the only place they can be placed
+# correctly, so this script turns that setting on (in case you turned it
+# off) rather than reproducing them by wrapping $env.PROMPT_COMMAND,
+# where reedline would have to guess their display width.
+#
+# What nushell does not know about is iTerm2's OSC 1337 layer, and that
+# is what this script adds:
+#
+#   OSC 1337;RemoteHost=user@host   who and where you are
+#   OSC 1337;CurrentDir=<path>      the working directory
+#   OSC 1337;SetUserVar=key=<b64>   user-defined variables, for badges
+#                                   and \(user.<key>) interpolations
+#   OSC 1337;ShellIntegrationVersion and the shell name
+#
+# Two consequences of letting nushell own OSC 133 are worth knowing.
+# First, its marks do not carry the per-command aid= identifier the
+# bash/zsh/fish marks do, so nested sessions cannot be closed by aid.
+# That is the same tradeoff the fish script makes on fish 4.1+, where
+# fish emits the marks natively. Second, hooks only run in the
+# interactive REPL, so nothing here fires under `nu -c` or `nu
+# script.nu` -- which is exactly what we want.
+
+# Emit an OSC sequence: ESC ] <payload> BEL.
+#
+# \u{1B} and \u{07} are used rather than \e and \a (which nushell's
+# parser does accept) because \u{X...} is the escape form nushell's
+# documentation actually specifies, and rather than (char esc), which
+# does not exist.
+def "iterm2 osc" [payload: string] {
+    print --no-newline $"\u{1B}]($payload)\u{07}"
+}
+
+# Set a user-defined variable. The value is base64-encoded, exactly as
+# in the other shells' scripts.
+def "iterm2 set-user-var" [key: string, value: string] {
+    iterm2 osc $"1337;SetUserVar=($key)=($value | encode base64)"
+}
+
+# hostname -f is fast on macOS so don't cache it: that lets us pick up a
+# change, such as when you attach to a VPN. Set $env.iterm2_hostname
+# before sourcing this script if hostname is slow for you.
+def "iterm2 hostname" [] {
+    let configured = ($env.iterm2_hostname? | default "")
+    if $configured != "" {
+        return $configured
+    }
+    # `complete` captures stderr, so a BSD hostname(1) that has no -f
+    # (NetBSD, OpenBSD) can't scribble its usage message onto the
+    # prompt. `do --ignore-errors` covers hostname being absent
+    # entirely, in which case the result is null.
+    let long = (do --ignore-errors { ^hostname -f | complete })
+    if ($long | is-not-empty) and $long.exit_code == 0 {
+        let trimmed = ($long.stdout | str trim)
+        if $trimmed != "" {
+            return $trimmed
+        }
+    }
+    let short = (do --ignore-errors { ^hostname | complete })
+    if ($short | is-not-empty) and $short.exit_code == 0 {
+        return ($short.stdout | str trim)
+    }
+    ""
+}
+
+# Report who and where we are. Runs once at load time and then before
+# every prompt, which is where the other shells report it too (zsh's
+# iterm2_print_state_data, called from iterm2_after_cmd_executes).
+#
+# To report your own variables, set $env.iterm2_print_user_vars to a
+# closure AFTER sourcing this script -- the commands above have to be in
+# scope when the closure is parsed. For example:
+#
+#   $env.iterm2_print_user_vars = {||
+#       iterm2 set-user-var gitBranch (git branch --show-current)
+#   }
+def "iterm2 report-state" [] {
+    let user = ($env.USER? | default ($env.LOGNAME? | default ""))
+    iterm2 osc $"1337;RemoteHost=($user)@(iterm2 hostname)"
+    iterm2 osc $"1337;CurrentDir=($env.PWD)"
+    let printer = ($env.iterm2_print_user_vars? | default null)
+    if ($printer | describe) == "closure" {
+        do $printer
+    }
+}
+
+# The pre_prompt hook is registered as a string rather than a closure,
+# so its exact text is also the sentinel that says this file has already
+# been sourced. The sentinel cannot go stale, because it *is* the hook:
+# if the hook is gone, so is the marker.
+#
+# String hooks are a documented hook form, not an introspection trick.
+# nu-cmd-base's eval_hook has parsed and evaluated Value::String hooks
+# since well before the 0.100 floor, and the Value::List branch recurses
+# into each element, so a string inside pre_prompt's list is exercised
+# code. The earlier approach -- reading closures back with `view source`
+# -- leaned on a debug command whose output the 0.101 release notes
+# explicitly tell scripts not to depend on, and which had already
+# changed format once in 0.93.
+#
+# Two consequences, both accepted deliberately:
+#
+#   * The string is parsed once per prompt. It is a single command call
+#     with no arguments, so the cost is a rounding error next to the
+#     `hostname` the hook already shells out to.
+#
+#   * The command name is resolved at each prompt rather than captured
+#     when the hook is registered, so a command that shadows or hides it
+#     would change what the hook does. Hence the deliberately private
+#     name below: "iterm2-shell-integration pre-prompt" is not something
+#     another tool or a user is likely to define by accident, and it is
+#     not part of the interface this script offers (that is
+#     `iterm2 set-user-var`).
+const iterm2_pre_prompt_hook = "iterm2-shell-integration pre-prompt"
+
+def "iterm2-shell-integration pre-prompt" [] {
+    iterm2 report-state
+}
+
+# Has this file already been sourced in this process?
+#
+# The other shells answer that with ITERM_SHELL_INTEGRATION_INSTALLED,
+# but they set it as a plain shell variable that child processes never
+# see. nushell has no such thing: everything in $env is handed to
+# externals, so writing it here would export it, and a bash or zsh
+# started from this shell would find it set and skip its own
+# integration entirely. So look for our own hook instead: it lives in
+# $env.config, which never leaves the process. A type check keeps the
+# comparison honest when a hook is a closure or a conditional record,
+# both of which pre_prompt also accepts.
+def "iterm2 hook-registered" [] {
+    ($env.config.hooks.pre_prompt? | default [])
+    | any {|hook|
+        ($hook | describe) == "string" and $hook == $iterm2_pre_prompt_hook
+    }
+}
+
+# Don't run in IDE terminals. TERM_PROGRAM is set by the local terminal
+# but not forwarded over SSH. LC_TERMINAL is set by iTerm2 and may be
+# forwarded over SSH. Shell integration does not work under tmux or
+# screen unless you opt in with
+# ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX.
+#
+# ITERM_SHELL_INTEGRATION_INSTALLED is read but never written. It is a
+# deliberate opt-out: someone who exports it is asking every shell to
+# skip its integration, and bash and zsh obey it the same way when it
+# reaches them through the environment. Do not "fix" this by clearing
+# or ignoring an inherited value -- that would defeat the opt-out. The
+# double-source problem it solves elsewhere is handled here by
+# iterm2 hook-registered, which needs no environment variable.
+let iterm2_term = ($env.TERM? | default "")
+let iterm2_term_program = ($env.TERM_PROGRAM? | default "")
+let iterm2_active = (
+    $nu.is-interactive
+    and ($env.ITERM_SHELL_INTEGRATION_INSTALLED? | default "") == ""
+    and (not (iterm2 hook-registered))
+    and (
+        $iterm2_term_program == ""
+        or $iterm2_term_program == "iTerm.app"
+        or ($env.LC_TERMINAL? | default "") == "iTerm2"
+    )
+    and $iterm2_term not-in ["linux", "dumb"]
+    and (
+        ($env.ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX? | default "") != ""
+        or $iterm2_term not-in ["screen", "screen-256color", "tmux-256color"]
+    )
+)
+
+# The $env.config assignment happens at the top level of the file rather
+# than inside an `if` block, so there is no question about which scope it
+# lands in.
+#
+# pre_prompt must be a list from 0.101 on, and defaults to null on
+# 0.100, hence the `default []`.
+$env.config = (
+    if $iterm2_active {
+        $env.config
+        | upsert shell_integration.osc133 true
+        | upsert hooks.pre_prompt (
+            ($env.config.hooks.pre_prompt? | default [])
+            | append $iterm2_pre_prompt_hook
+        )
+    } else {
+        $env.config
+    }
+)
+
+if $iterm2_active {
+    iterm2 report-state
+    iterm2 osc "1337;ShellIntegrationVersion=1;shell=nu"
+}
+
+# it2 CLI over iTerm2 SSH integration: materialize the embedded copy
+# (named by content hash, so a shipped update replaces a stale one) and
+# define an `it2` command.
+#
+# nushell resolves command names at parse time, so this cannot be
+# skipped conditionally the way the other shells skip it when it2
+# already exists. Instead the command checks at run time and hands off
+# to an it2 that is already on PATH, falling back to the embedded copy
+# only when there is none.
+def --wrapped it2 [...args] {
+    # --all because without it `which` stops at this very command.
+    let existing = (which --all it2 | where type == "external")
+    if ($existing | is-not-empty) {
+        let it2_path = ($existing | first | get path)
+        ^$it2_path ...$args
+        return
+    }
+    let python = (which python3 | where type == "external")
+    if ($python | is-empty) {
+        print --stderr "it2: python3 is required"
+        return
+    }
+    let py = ($python | first | get path)
+    let home = ($env.HOME? | default "~" | path expand)
+    let target = ($home | path join ".iterm2" "it2.${IT2_PY_HASH}.py")
+    if not ($target | path exists) {
+        let blob = "${IT2_PY_B64}"
+        let materialize = (do --ignore-errors {
+            ^$py -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' $blob $target | complete
+        })
+        if ($materialize | is-empty) or $materialize.exit_code != 0 {
+            print --stderr "it2: could not be installed"
+            return
+        }
+    }
+    ^$py $target ...$args
+}
