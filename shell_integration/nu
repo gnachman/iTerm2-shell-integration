@@ -148,9 +148,15 @@ def "iterm2-shell-integration pre-prompt" [] {
 # $env.config, which never leaves the process. A type check keeps the
 # comparison honest when a hook is a closure or a conditional record,
 # both of which pre_prompt also accepts.
+#
+# pre_prompt is a list from 0.101 on, but on the 0.100 floor it may be a
+# single bare hook rather than a list, and `default []` only substitutes
+# for null. `any` accepts only a list and rejects a bare value before the
+# per-element type check runs, so normalize to a list first.
 def "iterm2 hook-registered" [] {
-    ($env.config.hooks.pre_prompt? | default [])
-    | any {|hook|
+    let hooks = ($env.config.hooks.pre_prompt? | default [])
+    let hook_list = (if ($hooks | describe | str starts-with "list") { $hooks } else { [$hooks] })
+    $hook_list | any {|hook|
         ($hook | describe) == "string" and $hook == $iterm2_pre_prompt_hook
     }
 }
