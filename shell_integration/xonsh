@@ -303,7 +303,7 @@ try:
         _iterm2_it2_path = _iterm2_os.path.join(_iterm2_dir, "it2.212690748889c7bb.py")
         _iterm2_py = _iterm2_shutil.which("python3")
         if _iterm2_py and not _iterm2_os.path.exists(_iterm2_it2_path):
-            import base64 as _iterm2_b64, glob as _iterm2_glob, gzip as _iterm2_gzip, tempfile as _iterm2_tf
+            import base64 as _iterm2_b64, gzip as _iterm2_gzip, tempfile as _iterm2_tf
             _iterm2_os.makedirs(_iterm2_dir, exist_ok=True)
             _iterm2_fd, _iterm2_tmp = _iterm2_tf.mkstemp(dir=_iterm2_dir)
             try:
@@ -319,13 +319,6 @@ try:
                     _iterm2_os.remove(_iterm2_tmp)
                 except OSError:
                     pass
-            else:
-                for _iterm2_old in _iterm2_glob.glob(_iterm2_os.path.join(_iterm2_dir, "it2*.py")):
-                    if _iterm2_old != _iterm2_it2_path:
-                        try:
-                            _iterm2_os.remove(_iterm2_old)
-                        except OSError:
-                            pass
         if _iterm2_py and _iterm2_os.path.exists(_iterm2_it2_path):
             aliases["it2"] = [_iterm2_py, _iterm2_it2_path]
         else:

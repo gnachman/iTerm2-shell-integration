@@ -211,7 +211,7 @@ if ( $status != 0 ) then
   which python3 >& /dev/null
   if ( $status == 0 ) then
     if ( ! -f "$HOME/.iterm2/it2.${IT2_PY_HASH}.py" ) then
-      python3 -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' "${IT2_PY_B64}" "$HOME/.iterm2/it2.${IT2_PY_HASH}.py"
+      python3 -c 'import base64,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2])' "${IT2_PY_B64}" "$HOME/.iterm2/it2.${IT2_PY_HASH}.py"
     endif
     alias it2 'python3 "$HOME/.iterm2/it2.${IT2_PY_HASH}.py" \!*'
   else
