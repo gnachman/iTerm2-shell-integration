@@ -25,6 +25,7 @@ Requires only the Python standard library and Python 3.7+ (guaranteed present:
 the framer this talks to already runs under it).
 """
 
+import base64
 import json
 import os
 import signal
@@ -367,6 +368,69 @@ def connect_to_iterm2(candidates):
     return None, last_error
 
 
+# Stdin is forwarded whole in the HELLO frame, so it has to be bounded. A Claude Code
+# PostToolUse payload can carry a large tool result, so this is generous; the framer's own frame
+# cap is 16 MiB, well above it.
+MAX_STDIN_BYTES = 1024 * 1024
+
+# The only variables sent to iTerm2. An allowlist, not a filter: the environment of a remote
+# shell holds credentials, tokens and paths that have no business crossing to the Mac, and the
+# app needs exactly these to address a session.
+#   TMUX, TMUX_PANE  - which tmux pane this is, for pane addressing
+#   TERM_SESSION_ID  - the session, when iTerm2 forked the job itself
+#   IT2_SUITE        - which iTerm2 instance
+#   IT2_PY           - which interpreter this connection uploaded
+ALLOWED_ENV_NAMES = ("TMUX", "TMUX_PANE", "TERM_SESSION_ID", "IT2_SUITE", "IT2_PY")
+
+
+def allowed_environment(env):
+    """The allowlisted subset of `env`. Absent names are omitted rather than sent empty, so the
+    app can tell "unset" from "set to nothing"."""
+    return {name: env[name] for name in ALLOWED_ENV_NAMES if name in env}
+
+
+# The only subcommand whose payload arrives on stdin. Reading stdin for ANY command would hang
+# the ones that do not expect it: stdin is often an inherited pipe that never reaches EOF (a
+# script, a test harness, a program that keeps its end open), and read() would block forever.
+# Found exactly that way -- `it2 session list` timed out in tests/it2py_test.py the moment this
+# was unconditional.
+STDIN_CONSUMING_COMMANDS = ("handle-agent-hook",)
+
+
+def wants_stdin(argv):
+    """Whether this invocation's command reads a payload from stdin."""
+    for argument in argv:
+        if argument.startswith("-"):
+            continue
+        return argument in STDIN_CONSUMING_COMMANDS
+    return False
+
+
+def read_stdin_payload(stream):
+    """Stdin's bytes when it is not a tty, else None.
+
+    A hook is invoked with its payload on stdin, so a remote `it2 handle-agent-hook` needs it.
+    An interactive invocation must never be drained: `it2 handle-agent-hook` typed at a prompt
+    would block until the user sent EOF. Unreadable stdin is not an error; the command simply
+    has no payload.
+
+    Only called for a command in STDIN_CONSUMING_COMMANDS; see wants_stdin.
+    """
+    try:
+        if stream is None or stream.isatty():
+            return None
+    except (OSError, ValueError):
+        return None
+    try:
+        buffer = getattr(stream, "buffer", stream)
+        data = buffer.read(MAX_STDIN_BYTES)
+    except (OSError, ValueError):
+        return None
+    if not data:
+        return None
+    return data
+
+
 def main():
     candidates = tmux_advertised_client_records()
     own_sock_path = os.environ.get("IT2_SOCK")
@@ -393,7 +457,14 @@ def main():
         "isatty": safe_isatty(),
         "cols": cols,
         "rows": rows,
+        "env": allowed_environment(os.environ),
     }
+    # In the HELLO itself, not a later frame: startCommand launches the command as soon as HELLO
+    # arrives, so anything sent afterwards would race it.
+    if wants_stdin(sys.argv[1:]):
+        stdin_payload = read_stdin_payload(sys.stdin)
+        if stdin_payload is not None:
+            hello["stdin"] = base64.b64encode(stdin_payload).decode("ascii")
     try:
         send_frame(sock, HELLO, json.dumps(hello))
     except OSError as e:
