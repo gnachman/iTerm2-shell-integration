@@ -202,6 +202,19 @@ if ( ! ($?iterm2_shell_integration_installed)) then
   endif
 endif
 
+# Put iTerm2's uploaded it2 on PATH, ahead of the shell function below. Exported, so a program
+# started from this shell passes it on: a Claude Code hook runs through `sh -c` and an agent's
+# Bash tool does too, and neither sees a shell function. Done here rather than from the app
+# because the real PATH is only known in the login shell; the conductor cannot express a prepend
+# (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
+# on absence from PATH, so re-sourcing does not stack duplicates.
+if ( -d "$HOME/.iterm2/bin" ) then
+  if ( "$path" !~ *"$HOME/.iterm2/bin"* ) then
+    set path = ( "$HOME/.iterm2/bin" $path )
+  endif
+endif
+
 # it2 CLI over iTerm2 SSH integration: materialize the embedded copy (named by
 # content hash, so a shipped update replaces a stale one) and alias it2 unless it
 # already exists (tcsh's which builtin also reports aliases). Without python3, alias

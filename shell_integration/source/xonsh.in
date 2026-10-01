@@ -290,6 +290,18 @@ class _iTerm2Xonsh:
 
 __xonsh__.iterm2 = _iTerm2Xonsh()
 
+# Put iTerm2's uploaded it2 on PATH, ahead of the shell function below. Exported, so a program
+# started from this shell passes it on: a Claude Code hook runs through `sh -c` and an agent's
+# Bash tool does too, and neither sees a shell function. Done here rather than from the app
+# because the real PATH is only known in the login shell; the conductor cannot express a prepend
+# (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
+# on absence from PATH, so re-sourcing does not stack duplicates.
+_iterm2_bin = _iterm2_os.path.expanduser("~/.iterm2/bin")
+if _iterm2_os.path.isdir(_iterm2_bin) and _iterm2_bin not in $PATH:
+    $PATH.insert(0, _iterm2_bin)
+del _iterm2_bin
+
 # it2 CLI over iTerm2 SSH integration: materialize the embedded copy (named by
 # content hash, so a shipped update replaces a stale one) and register an it2 alias
 # unless it2 already exists. Check aliases too: shutil.which only searches PATH and
