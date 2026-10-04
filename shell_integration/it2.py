@@ -13,7 +13,7 @@ Wire protocol (this client <-> framer socket), length-prefixed frames:
     [1 byte type][4 byte big-endian payload length][payload]
 
 Upstream (client -> iTerm2):
-    'H' HELLO   json: {nonce, argv, cwd, term, isatty, cols, rows}
+    'H' HELLO   json: {protocol, nonce, argv, cwd, term, isatty, cols, rows, env, stdin}
     'C' CANCEL  empty  (SIGINT; used by long-running/monitor commands)
 
 Downstream (iTerm2 -> client):
@@ -36,6 +36,11 @@ import sys
 import time
 
 HELLO = b"H"
+# Sent in the HELLO. iTerm2 serves this version and older, and refuses a newer client with an
+# explanation instead of running it half understood. Bump it, together with the app's
+# ConductorIT2Demux.protocolVersion, when the HELLO gains something a command cannot run
+# correctly without. A HELLO with no "protocol" predates the field and counts as older.
+PROTOCOL_VERSION = 1
 CANCEL = b"C"
 STDOUT = ord("O")
 STDERR = ord("E")
@@ -346,14 +351,64 @@ def connect_to_iterm2(candidates):
     a socket is never paired with another connection's nonce. A refused or missing
     socket moves on to the next candidate; the pane's own environment is normally last.
     """
+    sock, candidate = connect_to_candidate(candidates)
+    if sock is None:
+        return None, candidate
+    nonce = candidate.get("nonce")
+    return sock, (nonce if isinstance(nonce, str) else "")
+
+
+# Set in the environment of a re-exec, so a copy that disagrees about which file it is cannot
+# bounce back and forth.
+REEXEC_GUARD_NAME = "IT2_REEXECED"
+
+
+def reexec_path(candidate, own_path, env):
+    """The interpreter to hand this invocation to, or None to keep running this one.
+
+    A tmux pane inherits IT2_PY from the tmux server, frozen when whichever connection started
+    it. That copy may be older or newer than the iTerm2 now attached, so each controller's
+    record names the it2.py ITS connection uploaded as "py", and once a connection is chosen
+    the matching copy runs the command. Version and connection are then chosen together.
+
+    Only an absolute path to a file that exists, is not this file, and only once.
+    """
+    path = candidate.get("py")
+    if not isinstance(path, str) or not os.path.isabs(path):
+        return None
+    if env.get(REEXEC_GUARD_NAME):
+        return None
+    try:
+        if os.path.realpath(path) == os.path.realpath(own_path):
+            return None
+    except (OSError, ValueError):
+        return None
+    if not os.path.isfile(path):
+        return None
+    return path
+
+
+def reexec(path, argv, env):
+    """Replace this process with `path` running `argv`. Returns only if exec failed."""
+    child_env = dict(env)
+    child_env[REEXEC_GUARD_NAME] = "1"
+    # So the copy reports itself, not the server's stale value, to the app.
+    child_env["IT2_PY"] = path
+    interpreter = sys.executable or "python3"
+    try:
+        os.execve(interpreter, [interpreter, path] + list(argv), child_env)
+    except OSError:
+        pass
+
+
+def connect_to_candidate(candidates):
+    """Like connect_to_iterm2, but returns the whole record that accepted: (socket, record)
+    or (None, error)."""
     last_error = None
     for candidate in candidates:
         path = candidate.get("sock")
         if not isinstance(path, str) or not path:
             continue
-        nonce = candidate.get("nonce")
-        if not isinstance(nonce, str):
-            nonce = ""
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.connect(path)
@@ -364,7 +419,7 @@ def connect_to_iterm2(candidates):
             except OSError:
                 pass
             continue
-        return sock, nonce
+        return sock, candidate
     return None, last_error
 
 
@@ -441,15 +496,28 @@ def main():
         return 2
 
     try:
-        sock, nonce = connect_to_iterm2(candidates)
+        sock, candidate = connect_to_candidate(candidates)
+        if sock is not None:
+            path = reexec_path(candidate, os.path.abspath(__file__), os.environ)
+            if path:
+                # Connected only to learn which record answers; the copy connects for itself.
+                # Stdin has not been touched yet, so it reaches the copy intact.
+                sock.close()
+                reexec(path, sys.argv[1:], os.environ)
+                # The exec failed. Carry on as this copy rather than fail the command.
+                sock, candidate = connect_to_candidate(candidates)
     except KeyboardInterrupt:
         return 130
     if sock is None:
-        eprint("it2: cannot reach iTerm2 (%s)\n" % nonce)
+        eprint("it2: cannot reach iTerm2 (%s)\n" % candidate)
         return 2
+    nonce = candidate.get("nonce")
+    if not isinstance(nonce, str):
+        nonce = ""
 
     cols, rows = terminal_size()
     hello = {
+        "protocol": PROTOCOL_VERSION,
         "nonce": nonce,
         "argv": sys.argv[1:],
         "cwd": safe_getcwd(),
