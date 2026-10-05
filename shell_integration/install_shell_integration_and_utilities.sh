@@ -185,6 +185,40 @@ do
   echo "Downloading $U..."
   curl -SsL "https://iterm2.com/utilities/$U" > "$DOTDIR/.iterm2/$U" && chmod +x "$DOTDIR/.iterm2/$U"
 done
+
+# iTerm2's it2 command: a wrapper at ~/.iterm2/bin/it2, which the shell-integration script puts
+# first on PATH, and the Python program it runs, named by the hash the wrapper expects. Always
+# under $HOME, whatever DOTDIR is, because the shell-integration scripts and Claude Code hooks
+# look there. No alias: on a Mac the wrapper hands off to the native it2 iTerm2 puts on PATH.
+# The two files must come from the same build, so a pair whose hashes disagree is skipped
+# rather than leaving a wrapper that names a missing file.
+echo "Downloading it2..."
+IT2_TMP=$(mktemp -d 2>/dev/null || mktemp -d -t it2)
+if [ -n "$IT2_TMP" ] &&
+   curl -SsfL "https://iterm2.com/utilities/it2-wrapper" > "$IT2_TMP/it2" &&
+   curl -SsfL "https://iterm2.com/utilities/it2.py" > "$IT2_TMP/it2.py"; then
+  IT2_HASH=$(sed -n 's/.*it2\.\([0-9a-f]\{16\}\)\.py.*/\1/p' "$IT2_TMP/it2" | head -n 1)
+  if command -v shasum > /dev/null 2>&1; then
+    IT2_ACTUAL=$(shasum -a 256 "$IT2_TMP/it2.py" | cut -c1-16)
+  elif command -v sha256sum > /dev/null 2>&1; then
+    IT2_ACTUAL=$(sha256sum "$IT2_TMP/it2.py" | cut -c1-16)
+  else
+    IT2_ACTUAL="$IT2_HASH"
+  fi
+  if [ -n "$IT2_HASH" ] && [ "$IT2_HASH" = "$IT2_ACTUAL" ]; then
+    mkdir -p "$HOME/.iterm2/bin" &&
+      mv "$IT2_TMP/it2.py" "$HOME/.iterm2/it2.$IT2_HASH.py" &&
+      chmod +x "$IT2_TMP/it2" &&
+      mv "$IT2_TMP/it2" "$HOME/.iterm2/bin/it2" ||
+      echo "Skipping it2: couldn't install it."
+  else
+    echo "Skipping it2: the downloaded files don't match each other."
+  fi
+else
+  echo "Skipping it2: couldn't download it."
+fi
+test -n "$IT2_TMP" && rm -rf "$IT2_TMP"
+
 echo "Configuring utilities..."
 echo "$ALIASES" >> "${FILENAME}"
 test -n "$PATH_LINE" && echo "$PATH_LINE" >> "${FILENAME}"
