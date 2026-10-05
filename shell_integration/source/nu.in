@@ -24,14 +24,20 @@
 # off) rather than reproducing them by wrapping $env.PROMPT_COMMAND,
 # where reedline would have to guess their display width.
 #
-# What nushell does not know about is iTerm2's OSC 1337 layer, and that
+# What nushell does not know about is iTerm2's own reporting, and that
 # is what this script adds:
 #
-#   OSC 1337;RemoteHost=user@host   who and where you are
-#   OSC 1337;CurrentDir=<path>      the working directory
+#   OSC 7;file://user@host/path?machineID=<id>
+#                                   who and where you are, and whether
+#                                   the shell runs on this Mac
 #   OSC 1337;SetUserVar=key=<b64>   user-defined variables, for badges
 #                                   and \(user.<key>) interpolations
 #   OSC 1337;ShellIntegrationVersion and the shell name
+#
+# nushell can send OSC 7 itself ($env.config.shell_integration.osc7, on
+# by default), but without the machineID, which makes iTerm2 treat it as
+# a third-party report. This script turns that setting off and sends its
+# own report instead, the same way the fish and xonsh scripts do.
 #
 # Two consequences of letting nushell own OSC 133 are worth knowing.
 # First, its marks do not carry the per-command aid= identifier the
@@ -83,6 +89,65 @@ def "iterm2 hostname" [] {
     ""
 }
 
+# Percent-encode a path for the OSC 7 URL per RFC 3986: unreserved
+# characters and the path separator stay, every other character is
+# encoded byte by byte over UTF-8, as the receiver decodes it.
+def "iterm2 encode-path" [path: string] {
+    $path
+    | split chars
+    | each {|ch|
+        if ($ch =~ '^[A-Za-z0-9/._~-]$') {
+            $ch
+        } else {
+            $ch | encode utf8 | encode hex | str replace --all --regex '(..)' '%$1'
+        }
+    }
+    | str join
+}
+
+# Machine identity for OSC 7 localhost detection, sent as
+# ?machineID=<version>:<value>. Version 1 is the HMAC-SHA256 of macOS's
+# kern.bootsessionuuid under a fixed, public protocol key, as lowercase
+# hex: iTerm2 computes the same value and compares, so it knows the shell
+# shares its filesystem without matching hostnames. The raw per-boot
+# UUID is never sent. A known non-Darwin host cannot be this Mac and
+# sends the empty value ("1:"); a Darwin failure, or an OS that cannot be
+# determined, sends "0:" (identity unavailable), so iTerm2 falls back to
+# hostname matching.
+#
+# This runs sysctl and openssl, so it is computed once when the script
+# is loaded, not per prompt. The result is kept in the pre_prompt hook
+# (see below), which lives in $env.config and so never reaches child
+# processes or an ssh session.
+def "iterm2 machine-id" [] {
+    let os = ($nu.os-info.name? | default "")
+    if $os == "" {
+        return "0:"
+    }
+    if $os != "macos" {
+        return "1:"
+    }
+    let bsid = (do --ignore-errors { ^sysctl -n kern.bootsessionuuid | complete })
+    if ($bsid | is-empty) or $bsid.exit_code != 0 {
+        return "0:"
+    }
+    let uuid = ($bsid.stdout | str trim)
+    if $uuid == "" {
+        return "0:"
+    }
+    let hmac = (do --ignore-errors {
+        $uuid | ^/usr/bin/openssl dgst -sha256 -hmac "iterm2-osc7-machine-id" | complete
+    })
+    if ($hmac | is-empty) or $hmac.exit_code != 0 {
+        return "0:"
+    }
+    let digest = ($hmac.stdout | str trim | split row " " | last)
+    if not ($digest =~ '^[0-9a-f]{64}$') {
+        return "0:"
+    }
+    $"1:($digest)"
+}
+
 # Report who and where we are. Runs once at load time and then before
 # every prompt, which is where the other shells report it too (zsh's
 # iterm2_print_state_data, called from iterm2_after_cmd_executes).
@@ -94,10 +159,15 @@ def "iterm2 hostname" [] {
 #   $env.iterm2_print_user_vars = {||
 #       iterm2 set-user-var gitBranch (git branch --show-current)
 #   }
-def "iterm2 report-state" [] {
-    let user = ($env.USER? | default ($env.LOGNAME? | default ""))
-    iterm2 osc $"1337;RemoteHost=($user)@(iterm2 hostname)"
-    iterm2 osc $"1337;CurrentDir=($env.PWD)"
+#
+# The username and hostname are reduced to a safe character set, so a
+# URL-structural character (/, ?, # or whitespace) cannot restructure
+# the URL. The username keeps @, because URL parsers split the authority
+# on the last @.
+def "iterm2 report-state" [machine_id: string] {
+    let user = ($env.USER? | default ($env.LOGNAME? | default "") | str replace --all --regex '[^A-Za-z0-9._@-]' '')
+    let host = (iterm2 hostname | str replace --all --regex '[^A-Za-z0-9._-]' '')
+    iterm2 osc $"7;file://($user)@($host)(iterm2 encode-path $env.PWD)?machineID=($machine_id)"
     let printer = ($env.iterm2_print_user_vars? | default null)
     if ($printer | describe) == "closure" {
         do $printer
@@ -105,9 +175,11 @@ def "iterm2 report-state" [] {
 }
 
 # The pre_prompt hook is registered as a string rather than a closure,
-# so its exact text is also the sentinel that says this file has already
-# been sourced. The sentinel cannot go stale, because it *is* the hook:
-# if the hook is gone, so is the marker.
+# so its text is also the sentinel that says this file has already been
+# sourced. The sentinel cannot go stale, because it *is* the hook: if the
+# hook is gone, so is the marker. The string also carries the machine ID
+# as its argument, which keeps the value out of $env, where it would be
+# handed to every child process.
 #
 # String hooks are a documented hook form, not an introspection trick.
 # nu-cmd-base's eval_hook has parsed and evaluated Value::String hooks
@@ -121,8 +193,8 @@ def "iterm2 report-state" [] {
 # Two consequences, both accepted deliberately:
 #
 #   * The string is parsed once per prompt. It is a single command call
-#     with no arguments, so the cost is a rounding error next to the
-#     `hostname` the hook already shells out to.
+#     with one literal argument, so the cost is a rounding error next to
+#     the `hostname` the hook already shells out to.
 #
 #   * The command name is resolved at each prompt rather than captured
 #     when the hook is registered, so a command that shadows or hides it
@@ -133,8 +205,8 @@ def "iterm2 report-state" [] {
 #     `iterm2 set-user-var`).
 const iterm2_pre_prompt_hook = "iterm2-shell-integration pre-prompt"
 
-def "iterm2-shell-integration pre-prompt" [] {
-    iterm2 report-state
+def "iterm2-shell-integration pre-prompt" [machine_id: string] {
+    iterm2 report-state $machine_id
 }
 
 # Has this file already been sourced in this process?
@@ -147,17 +219,21 @@ def "iterm2-shell-integration pre-prompt" [] {
 # integration entirely. So look for our own hook instead: it lives in
 # $env.config, which never leaves the process. A type check keeps the
 # comparison honest when a hook is a closure or a conditional record,
-# both of which pre_prompt also accepts.
+# both of which pre_prompt also accepts. The match is on the whole
+# string, so a hook that merely contains our command name is not
+# mistaken for ours.
 #
 # pre_prompt is a list from 0.101 on, but on the 0.100 floor it may be a
 # single bare hook rather than a list, and `default []` only substitutes
 # for null. `any` accepts only a list and rejects a bare value before the
-# per-element type check runs, so normalize to a list first.
+# per-element type check runs, so normalize to a list first. On 0.100,
+# $env.config itself only exists if config.nu sets it, hence the `?` on
+# every step of the path.
 def "iterm2 hook-registered" [] {
-    let hooks = ($env.config.hooks.pre_prompt? | default [])
+    let hooks = ($env.config?.hooks?.pre_prompt? | default [])
     let hook_list = (if ($hooks | describe | str starts-with "list") { $hooks } else { [$hooks] })
     $hook_list | any {|hook|
-        ($hook | describe) == "string" and $hook == $iterm2_pre_prompt_hook
+        ($hook | describe) == "string" and ($hook =~ $"^($iterm2_pre_prompt_hook) '[01]:[0-9a-f]*'$")
     }
 }
 
@@ -192,27 +268,22 @@ let iterm2_active = (
     )
 )
 
-# The $env.config assignment happens at the top level of the file rather
-# than inside an `if` block, so there is no question about which scope it
-# lands in.
-#
 # pre_prompt must be a list from 0.101 on, and defaults to null on
-# 0.100, hence the `default []`.
-$env.config = (
-    if $iterm2_active {
-        $env.config
-        | upsert shell_integration.osc133 true
-        | upsert hooks.pre_prompt (
-            ($env.config.hooks.pre_prompt? | default [])
-            | append $iterm2_pre_prompt_hook
-        )
-    } else {
-        $env.config
-    }
-)
-
+# 0.100, hence the `default []`. On 0.100, $env.config only exists if
+# config.nu sets it; nushell fills in every setting a partial record
+# leaves out, so starting from an empty record there is safe.
 if $iterm2_active {
-    iterm2 report-state
+    let iterm2_machine_id = (iterm2 machine-id)
+    $env.config = (
+        ($env.config? | default {})
+        | upsert shell_integration.osc133 true
+        | upsert shell_integration.osc7 false
+        | upsert hooks.pre_prompt (
+            ($env.config?.hooks?.pre_prompt? | default [])
+            | append $"($iterm2_pre_prompt_hook) '($iterm2_machine_id)'"
+        )
+    )
+    iterm2 report-state $iterm2_machine_id
     iterm2 osc "1337;ShellIntegrationVersion=1;shell=nu"
 }
 
