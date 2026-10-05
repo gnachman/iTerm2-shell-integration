@@ -225,31 +225,34 @@ if $iterm2_active {
 # already exists. Instead the command checks at run time and hands off
 # to an it2 that is already on PATH, falling back to the embedded copy
 # only when there is none.
+#
+# Both branches end in the external call, so it is the command's result:
+# `it2 ... | from json` and `let x = (it2 ...)` see its output instead of
+# it going straight to the terminal. Failures raise an error, so a script
+# that checks the result sees them, as `return 1` does in the zsh script.
 def --wrapped it2 [...args] {
     # --all because without it `which` stops at this very command.
     let existing = (which --all it2 | where type == "external")
     if ($existing | is-not-empty) {
         let it2_path = ($existing | first | get path)
         ^$it2_path ...$args
-        return
-    }
-    let python = (which python3 | where type == "external")
-    if ($python | is-empty) {
-        print --stderr "it2: python3 is required"
-        return
-    }
-    let py = ($python | first | get path)
-    let home = ($env.HOME? | default "~" | path expand)
-    let target = ($home | path join ".iterm2" "it2.${IT2_PY_HASH}.py")
-    if not ($target | path exists) {
-        let blob = "${IT2_PY_B64}"
-        let materialize = (do --ignore-errors {
-            ^$py -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' $blob $target | complete
-        })
-        if ($materialize | is-empty) or $materialize.exit_code != 0 {
-            print --stderr "it2: could not be installed"
-            return
+    } else {
+        let python = (which python3 | where type == "external")
+        if ($python | is-empty) {
+            error make --unspanned {msg: "it2: python3 is required"}
         }
+        let py = ($python | first | get path)
+        let home = ($env.HOME? | default "~" | path expand)
+        let target = ($home | path join ".iterm2" "it2.${IT2_PY_HASH}.py")
+        if not ($target | path exists) {
+            let blob = "${IT2_PY_B64}"
+            let materialize = (do --ignore-errors {
+                ^$py -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' $blob $target | complete
+            })
+            if ($materialize | is-empty) or $materialize.exit_code != 0 {
+                error make --unspanned {msg: "it2: could not be installed"}
+            }
+        }
+        ^$py $target ...$args
     }
-    ^$py $target ...$args
 }
