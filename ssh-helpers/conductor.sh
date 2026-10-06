@@ -199,8 +199,7 @@ exec_login_shell() {
     log failed, just run it with -l
     # TODO - this is complicated, come back and do it later.
     #execute_sh_with_posix_env
-    unset RCOUNT
-    exec "$login_shell" "-l"
+      exec "$login_shell" "-l"
     log failed completely
     printf "%s\n" "Could not execute the shell $login_shell as a login shell" > /dev/stderr
     exec "$login_shell"
@@ -253,7 +252,6 @@ conductor_cmd_runpython() {
 
 really_run_python() {
   log really_run_python
-  unset RCOUNT
   ttypath=$(tty)
   log "tty is $ttypath"
   exec python3 << ENDOFSCRIPT
@@ -286,8 +284,7 @@ really_run() {
         return
     fi
     log exec "$SHELL" -c "$*"
-    unset RCOUNT
-    exec "$SHELL" -c "$*"
+      exec "$SHELL" -c "$*"
 }
 
 conductor_cmd_shell() {
@@ -391,15 +388,24 @@ write() {
 # Main Loop
 ################################################################################
 
-randomnumber() {
-    if [ -z "${RCOUNT}" ]; then
-      export RCOUNT=0
-    else
-      export RCOUNT=$((RCOUNT + 1))
+# Sets conductor_boundary to a new value for framing one command's output: a counter, so no two in
+# this conductor are ever the same, then random hex. Called directly, not through $( ), so the
+# counter survives. The randomness comes from /dev/urandom, or awk seeded with more than the clock
+# second, or, with neither available, the process id; the counter keeps it unique regardless.
+conductor_boundary_count=0
+new_boundary() {
+    conductor_boundary_count=$((conductor_boundary_count + 1))
+    local random=""
+    if [ -r /dev/urandom ]; then
+        random=$(command od -An -N8 -tx1 /dev/urandom 2>/dev/null | command tr -d ' \n' 2>/dev/null)
     fi
-
-    printf "%s." $RCOUNT
-    awk 'BEGIN { srand(); print int(rand() * 65536)""int(rand() * 65536)""int(rand() * 65536)""int(rand() * 65536) }'
+    if [ -z "$random" ]; then
+        random=$(command awk -v seed="$$$conductor_boundary_count" 'BEGIN { srand(seed + srand()); printf "%04x%04x%04x%04x", rand() * 65536, rand() * 65536, rand() * 65536, rand() * 65536 }' 2>/dev/null)
+    fi
+    if [ -z "$random" ]; then
+        random="p$$"
+    fi
+    conductor_boundary="$conductor_boundary_count.$random"
 }
 
 handle_command() {
@@ -412,7 +418,8 @@ handle_command() {
     local args=$(drop_first_word "${unparsed}")
     log args is $args
 
-    local boundary=$(randomnumber)
+    new_boundary
+    local boundary="$conductor_boundary"
     write begin $boundary
     log invoke $cmd_name with arguments $args
     set +e
