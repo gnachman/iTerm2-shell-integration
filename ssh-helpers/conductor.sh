@@ -362,16 +362,25 @@ conductor_cmd_getshell() {
     printf '\033\134'
 }
 
+# Runs base64-encoded code (a jump to the next host, say) by sourcing it from a file. The file is a
+# private, hidden one in ~/.iterm2, where everything else iTerm2 writes on a host lives, rather
+# than in /tmp, which on a shared host may be full or unwritable. SELF names it so the code can
+# remove it as soon as it starts (the jump script does); otherwise it is removed afterwards.
 conductor_cmd_eval() {
     log "eval $@"
     local b64="$1"
-    local mydir=$(mktemp -d "${TMPDIR:-/tmp/}it2ssh.XXXXXXXXXXXX")
-    local file="$mydir/it2ssh-eval"
-    log "mydir=$mydir tmpdir=${TMPDIR:-/tmp/} file=$file"
+    command mkdir -p "$HOME/.iterm2"
+    local file=$(command mktemp "$HOME/.iterm2/.eval.XXXXXXXXXXXX" 2>/dev/null)
+    if [ -z "$file" ]; then
+        # A read-only home: fall back to the temporary directory.
+        file=$(command mktemp "${TMPDIR:-/tmp/}.it2ssh-eval.XXXXXXXXXXXX")
+    fi
+    log "file=$file"
     printf "%s" "$b64" | base64_decode > "$file"
     log will source "$file" with content $(cat "$file")
+    SELF="$file"
     . "$file"
-    rm -f "$file"
+    command rm -f "$file"
     log "$file" finished executing
 }
 
