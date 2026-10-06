@@ -365,20 +365,20 @@ conductor_cmd_getshell() {
 # remove it as soon as it starts (the jump script does); otherwise it is removed afterwards.
 conductor_cmd_eval() {
     log "eval $@"
-    local b64="$1"
+    # No `local`, as in new_boundary.
     command mkdir -p "$HOME/.iterm2"
-    local file=$(command mktemp "$HOME/.iterm2/.eval.XXXXXXXXXXXX" 2>/dev/null)
-    if [ -z "$file" ]; then
+    conductor_eval_file=$(command mktemp "$HOME/.iterm2/.eval.XXXXXXXXXXXX" 2>/dev/null)
+    if [ -z "$conductor_eval_file" ]; then
         # A read-only home: fall back to the temporary directory.
-        file=$(command mktemp "${TMPDIR:-/tmp/}.it2ssh-eval.XXXXXXXXXXXX")
+        conductor_eval_file=$(command mktemp "${TMPDIR:-/tmp/}.it2ssh-eval.XXXXXXXXXXXX")
     fi
-    log "file=$file"
-    printf "%s" "$b64" | base64_decode > "$file"
-    log will source "$file" with content $(cat "$file")
-    SELF="$file"
-    . "$file"
-    command rm -f "$file"
-    log "$file" finished executing
+    log "file=$conductor_eval_file"
+    printf "%s" "$1" | base64_decode > "$conductor_eval_file"
+    log will source "$conductor_eval_file" with content $(cat "$conductor_eval_file")
+    SELF="$conductor_eval_file"
+    . "$conductor_eval_file"
+    command rm -f "$conductor_eval_file"
+    log "$conductor_eval_file" finished executing
 }
 
 write() {
@@ -394,18 +394,19 @@ write() {
 # second, or, with neither available, the process id; the counter keeps it unique regardless.
 conductor_boundary_count=0
 new_boundary() {
+    # No `local`: ksh93 lacks it, so these variables are named to stay out of everyone's way.
     conductor_boundary_count=$((conductor_boundary_count + 1))
-    local random=""
+    conductor_boundary_random=""
     if [ -r /dev/urandom ]; then
-        random=$(command od -An -N8 -tx1 /dev/urandom 2>/dev/null | command tr -d ' \n' 2>/dev/null)
+        conductor_boundary_random=$(command od -An -N8 -tx1 /dev/urandom 2>/dev/null | command tr -d ' \n' 2>/dev/null)
     fi
-    if [ -z "$random" ]; then
-        random=$(command awk -v seed="$$$conductor_boundary_count" 'BEGIN { srand(seed + srand()); printf "%04x%04x%04x%04x", rand() * 65536, rand() * 65536, rand() * 65536, rand() * 65536 }' 2>/dev/null)
+    if [ -z "$conductor_boundary_random" ]; then
+        conductor_boundary_random=$(command awk -v seed="$$$conductor_boundary_count" 'BEGIN { srand(seed + srand()); printf "%04x%04x%04x%04x", rand() * 65536, rand() * 65536, rand() * 65536, rand() * 65536 }' 2>/dev/null)
     fi
-    if [ -z "$random" ]; then
-        random="p$$"
+    if [ -z "$conductor_boundary_random" ]; then
+        conductor_boundary_random="p$$"
     fi
-    conductor_boundary="$conductor_boundary_count.$random"
+    conductor_boundary="$conductor_boundary_count.$conductor_boundary_random"
 }
 
 handle_command() {
