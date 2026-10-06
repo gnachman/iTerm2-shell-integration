@@ -195,8 +195,8 @@ done
 echo "Downloading it2..."
 IT2_TMP=$(mktemp -d 2>/dev/null || mktemp -d -t it2)
 if [ -n "$IT2_TMP" ] &&
-   curl -SsfL "https://iterm2.com/shell_integration/it2-wrapper" > "$IT2_TMP/it2" &&
-   curl -SsfL "https://iterm2.com/shell_integration/it2.py" > "$IT2_TMP/it2.py"; then
+   curl -SsfL "https://iterm2.com/shell_integration/v2/it2-wrapper" > "$IT2_TMP/it2" &&
+   curl -SsfL "https://iterm2.com/shell_integration/v2/it2.py" > "$IT2_TMP/it2.py"; then
   IT2_HASH=$(sed -n 's/.*it2\.\([0-9a-f]\{16\}\)\.py.*/\1/p' "$IT2_TMP/it2" | head -n 1)
   if command -v shasum > /dev/null 2>&1; then
     IT2_ACTUAL=$(shasum -a 256 "$IT2_TMP/it2.py" | cut -c1-16)
