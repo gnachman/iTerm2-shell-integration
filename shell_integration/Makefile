@@ -21,7 +21,7 @@ PREEXEC := ../submodules/bash-preexec/bash-preexec.sh
 # place with a fresh mtime and ship it. Delete the target on failure instead.
 .DELETE_ON_ERROR:
 
-all: bash zsh fish tcsh xonsh nu
+all: bash zsh fish tcsh xonsh nu it2-wrapper
 
 bash: source/bash.0 source/bash.1 $(PREEXEC) it2.py
 	cat source/bash.0 $(PREEXEC) source/bash.1 | envsubst $(VARS) > bash
@@ -40,5 +40,12 @@ xonsh: source/xonsh.in it2.py
 
 nu: source/nu.in it2.py
 	envsubst $(VARS) < source/nu.in > nu
+
+# ~/.iterm2/bin/it2: runs it2.py, falling back to the copy named by its hash. iTerm2 uploads it
+# over SSH Integration and the installers install it, always alongside the it2.py it was built
+# with. Only $IT2_PY_B64 and $IT2_PY_HASH are substituted, so its shell variables survive.
+it2-wrapper: source/it2-wrapper.in it2.py
+	envsubst $(VARS) < source/it2-wrapper.in > it2-wrapper
+	chmod 755 it2-wrapper
 
 .PHONY: all
