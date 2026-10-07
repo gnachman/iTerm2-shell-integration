@@ -34,6 +34,11 @@ DOTDIR="$HOME"
 SHELL_AND='&&'
 SHELL_OR='||'
 QUOTE=''
+# Set by shells that load the script from a directory instead of from a dotfile.
+FILENAME_OVERRIDE=''
+NO_DOTFILE=''
+# Quote character for the path in the printed "source" hint.
+SOURCE_HINT_QUOTE=''
 if [ "${SHELL}" = tcsh ]
 then
   URL="https://iterm2.com/shell_integration/v2/tcsh"
@@ -82,25 +87,69 @@ then
   HOME_PREFIX='{$HOME}'
   QUOTE='"'
 fi
+if [ "${SHELL}" = nu ]
+then
+  URL="https://iterm2.com/shell_integration/v2/nu"
+  # nushell sources every .nu file in its autoload directories at startup,
+  # after config.nu, so there is no dotfile to edit -- dropping the script in
+  # place is the whole installation. Ask nu which directory to use rather than
+  # guessing. nushell 0.102 and later read the user autoload directory under
+  # the config directory ($nu.user-autoload-dirs). 0.100 and 0.101 only read
+  # the vendor autoload directories, so there the script goes into the per-user
+  # one under the data directory, which every later version reads too.
+  # shellcheck disable=SC2016 # nushell code, $nu is for nu to expand
+  NU_AUTOLOAD_DIR=$(nu --no-config-file -c 'print ($nu.user-autoload-dirs? | default [($nu.data-dir | path join vendor autoload)] | first)' 2>/dev/null)
+  if [ -z "${NU_AUTOLOAD_DIR}" ]; then
+    # Only reached when nu itself cannot be run, so assume a current nushell
+    # and its user autoload directory. nushell honors XDG_CONFIG_HOME on every
+    # platform, but only when it is an absolute path -- that requirement came
+    # in with XDG support in 0.92. Otherwise it uses the platform config
+    # directory, which on macOS is ~/Library/Application Support, not ~/.config.
+    NU_UNAME=$(uname 2>/dev/null) || NU_UNAME=""
+    case "${XDG_CONFIG_HOME:-}" in
+      /*)
+        NU_CONFIG_DIR="${XDG_CONFIG_HOME}/nushell"
+        ;;
+      *)
+        if [ "${NU_UNAME}" = Darwin ]; then
+          NU_CONFIG_DIR="${HOME}/Library/Application Support/nushell"
+        else
+          # Also covers uname being absent or failing.
+          NU_CONFIG_DIR="${HOME}/.config/nushell"
+        fi
+        ;;
+    esac
+    NU_AUTOLOAD_DIR="${NU_CONFIG_DIR}/autoload"
+  fi
+  mkdir -p "${NU_AUTOLOAD_DIR}"
+  FILENAME_OVERRIDE="${NU_AUTOLOAD_DIR}/iterm2_shell_integration.nu"
+  NO_DOTFILE=1
+  # The path contains a space on macOS (~/Library/Application Support), and an
+  # unquoted path is a parse error in nu. Single quotes, because nu does not
+  # process escapes inside them.
+  SOURCE_HINT_QUOTE="'"
+fi
 if [ "${URL}" = "" ]
 then
-  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, tcsh, xonsh and zsh are supported. Sorry!"
+  die "Your shell, ${SHELL}, is not supported yet. Only bash, fish, nu, tcsh, xonsh and zsh are supported. Sorry!"
   exit 1
 fi
 
-FILENAME="${DOTDIR}/.iterm2_shell_integration.${SHELL}"
+FILENAME="${FILENAME_OVERRIDE:-${DOTDIR}/.iterm2_shell_integration.${SHELL}}"
 RELATIVE_FILENAME="${HOME_PREFIX}/.iterm2_shell_integration.${SHELL}"
 echo "Downloading script from ${URL} and saving it to ${FILENAME}..."
 curl -SsL "${URL}" > "${FILENAME}" || die "Couldn't download script from ${URL}"
 chmod +x "${FILENAME}"
-echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
-if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
+  if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
 	echo "Appending source command to ${SCRIPT}..."
 	cat <<-EOF >> "${SCRIPT}"
 
 	test -e ${QUOTE}${RELATIVE_FILENAME}${QUOTE} ${SHELL_AND} source ${QUOTE}${RELATIVE_FILENAME}${QUOTE} ${SHELL_OR} true
 
 EOF
+  fi
 fi
 
 echo "Done."
@@ -109,6 +158,10 @@ echo ""
 echo "A script was installed to ${FILENAME}"
 echo ""
 echo "To make it work right now, do:"
-echo "  source ${FILENAME}"
+echo "  source ${SOURCE_HINT_QUOTE}${FILENAME}${SOURCE_HINT_QUOTE}"
 echo
-echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+else
+  echo "It went into a directory ${SHELL} loads at startup, so the next time you log in it will be loaded automatically."
+fi

@@ -21,7 +21,7 @@ PREEXEC := ../submodules/bash-preexec/bash-preexec.sh
 # place with a fresh mtime and ship it. Delete the target on failure instead.
 .DELETE_ON_ERROR:
 
-all: bash zsh fish tcsh xonsh
+all: bash zsh fish tcsh xonsh nu
 
 bash: source/bash.0 source/bash.1 $(PREEXEC) it2.py
 	cat source/bash.0 $(PREEXEC) source/bash.1 | envsubst $(VARS) > bash
@@ -37,5 +37,8 @@ tcsh: source/tcsh.in it2.py
 
 xonsh: source/xonsh.in it2.py
 	envsubst $(VARS) < source/xonsh.in > xonsh
+
+nu: source/nu.in it2.py
+	envsubst $(VARS) < source/nu.in > nu
 
 .PHONY: all
