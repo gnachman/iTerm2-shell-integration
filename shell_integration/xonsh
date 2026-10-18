@@ -297,6 +297,7 @@ __xonsh__.iterm2 = _iTerm2Xonsh()
 # (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
 # Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
 # on absence from PATH, so re-sourcing does not stack duplicates.
+import os as _iterm2_os
 _iterm2_bin = _iterm2_os.path.expanduser("~/.iterm2/bin")
 if _iterm2_os.path.isdir(_iterm2_bin) and _iterm2_bin not in $PATH:
     $PATH.insert(0, _iterm2_bin)
