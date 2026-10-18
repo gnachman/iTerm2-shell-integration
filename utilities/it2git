@@ -40,7 +40,7 @@ GIT_BINARY=/usr/bin/git
 export GIT_OPTIONAL_LOCKS=0
 
 # Reads `status --porcelain -b -z` once and sets BRANCH, PUSH_COUNT, PULL_COUNT, DIRTY, ADDS
-# (untracked files), DELETES (deleted in the work tree) and UNMERGED (newline-separated paths).
+# (untracked files), DELETES (deleted in the work tree) and UNMERGED (an array of paths).
 # Every untracked file counts, not just its directory, as libgit2 lists them.
 read_status() {
     BRANCH=""
@@ -48,7 +48,7 @@ read_status() {
     PULL_COUNT=""
     ADDS=0
     DELETES=0
-    UNMERGED=""
+    UNMERGED=()
     local count=0 record xy path skip=0 header counts upstream ahead behind item
     while IFS= read -r -d '' record; do
         if ((skip)); then
@@ -101,12 +101,15 @@ read_status() {
         count=$((count + 1))
         case "$xy" in
             '??') ADDS=$((ADDS + 1)); continue ;;
-            DD|AU|UD|UA|DU|AA|UU) UNMERGED="$UNMERGED$path"$'\n'; continue ;;
+            DD|AU|UD|UA|DU|AA|UU) UNMERGED[${#UNMERGED[@]}]="$path"; continue ;;
         esac
         case "$xy" in
-            R*|C*) skip=1 ;;
+            # A rename in the work tree (of an intent-to-add file) has its R in the second column.
+            R*|C*|?R|?C) skip=1 ;;
         esac
-        if [[ "${xy:1:1}" == "D" ]]; then
+        # libgit2 finds no renames in the work tree, so the original of one renamed there (an
+        # intent-to-add file) is deleted.
+        if [[ "${xy:1:1}" == "D" || "${xy:1:1}" == "R" ]]; then
             DELETES=$((DELETES + 1))
         fi
     done < <("$GIT_BINARY" status --porcelain -b -z --untracked-files=all --ignore-submodules=all 2>/dev/null)
@@ -117,8 +120,13 @@ read_status() {
     fi
 }
 
+# Compared whole, since a path may hold any character but NUL. There are seldom more than a few.
 is_unmerged() {
-    [[ -n "$UNMERGED" && $'\n'"$UNMERGED" == *$'\n'"$1"$'\n'* ]]
+    local unmerged
+    for unmerged in ${UNMERGED[@]+"${UNMERGED[@]}"}; do
+        [[ "$unmerged" == "$1" ]] && return 0
+    done
+    return 1
 }
 
 # Changes against HEAD, without rename detection, as libgit2's stats pass sees them: a
