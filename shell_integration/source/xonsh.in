@@ -58,8 +58,9 @@ class _iTerm2Xonsh:
         @.env.register('ITERM2_INTEGRATION_DEBUG', type='bool', default=False,
                        doc="Set to `True` to enable debug messages.")
         @.env.register('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX', type='bool', default=False,
-                       doc="By default, shell Integration does not work with tmux or screen. "
-                           "If you'd like to use it with tmux, set `True`. "
+                       doc="Shell integration loads in tmux but not in GNU screen. "
+                           "Set `True` to load it anyway, as where tmux is reached through ssh "
+                           "with a screen terminal type. "
                            "Docs: https://iterm2.com/documentation-shell-integration.html")
 
     def print_err(self, msg):
