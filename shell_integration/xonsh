@@ -77,15 +77,25 @@ class _iTerm2Xonsh:
                 self.print_err('iTerm2 Integration: $TERM is not supported.')
             return False
 
+        # Inside tmux (TERM=tmux*, or $TMUX set when tmux uses a screen* TERM), tmux Integration
+        # passes the escape codes on intact and plain tmux discards them, so this loads; TERM=tmux*
+        # also reaches a host sshed to from a tmux pane. TERM=screen* without $TMUX is screen, or
+        # tmux beyond an ssh hop, and is skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it.
         tmux_enabled = @.env.get('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX')
-        if not tmux_enabled and term in ('screen', 'screen-256color', 'tmux-256color'):
+        in_tmux = bool(@.env.get('TMUX', '')) or term.startswith('tmux')
+        if not tmux_enabled and not in_tmux and term.startswith('screen'):
             if $ITERM2_INTEGRATION_DEBUG:
-                self.print_err('iTerm2 Integration: tmux is not enabled.')
+                self.print_err('iTerm2 Integration: screen is not supported.')
             return False
 
-        if 'iTerm' not in (term_program := @.env.get('TERM_PROGRAM', '')):
+        # Not in another terminal. TERM_PROGRAM is set by the local terminal but not forwarded over
+        # ssh; LC_TERMINAL is set by iTerm2 and may be. In tmux, TERM_PROGRAM is tmux's own.
+        term_program = @.env.get('TERM_PROGRAM', '')
+        if not (term_program == '' or 'iTerm' in term_program
+                or @.env.get('LC_TERMINAL', '') == 'iTerm2'
+                or (term_program == 'tmux' and in_tmux)):
             if $ITERM2_INTEGRATION_DEBUG:
-                self.print_err(f'iTerm2 Integration: iTerm not in $TERM_PROGRAM {term_program}.')
+                self.print_err(f'iTerm2 Integration: another terminal, $TERM_PROGRAM {term_program}.')
             return False
 
         return True

@@ -72,9 +72,11 @@ function iterm2_print_state_data() {
 
 # Usage: iterm2_set_user_var key value
 function iterm2_set_user_var() {
-  iterm2_begin_osc
-  printf "1337;SetUserVar=%s=%s" "$1" $(printf "%s" "$2" | base64 | tr -d '\n')
-  iterm2_end_osc
+  # Encoded before the sequence starts and written whole: tmux 2.6 to 3.0a give up on a sequence
+  # that pauses for 100 ms partway and show the rest as text.
+  local _iterm2_value
+  _iterm2_value=$(printf "%s" "$2" | base64 | tr -d '\n')
+  printf "\033]1337;SetUserVar=%s=%s\007" "$1" "$_iterm2_value"
 }
 
 if [ -z "$(type -t iterm2_print_user_vars)" ] || [ "$(type -t iterm2_print_user_vars)" != function ]; then

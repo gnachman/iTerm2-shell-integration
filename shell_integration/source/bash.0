@@ -17,7 +17,11 @@
 
 
 # -- BEGIN ITERM2 CUSTOMIZATIONS --
-if [[ "$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX""$TERM" != screen && "$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX""$TERM" != tmux-256color && "$ITERM_SHELL_INTEGRATION_INSTALLED" = "" && "$-" == *i* && "$TERM" != linux && "$TERM" != dumb ]]; then
+# Inside tmux (TERM=tmux*, or $TMUX set when tmux uses a screen* TERM), tmux Integration passes the
+# escape codes on intact and plain tmux discards them, so this loads; TERM=tmux* also reaches a host
+# sshed to from a tmux pane. TERM=screen* without $TMUX is screen, or tmux beyond an ssh hop, and is
+# skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it on.
+if [[ ( -n "$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX" || -n "$TMUX" || "$TERM" != screen* ) && "$ITERM_SHELL_INTEGRATION_INSTALLED" = "" && "$-" == *i* && "$TERM" != linux && "$TERM" != dumb ]]; then
 
 if shopt extdebug | grep on > /dev/null; then
   echo "iTerm2 Shell Integration not installed."
