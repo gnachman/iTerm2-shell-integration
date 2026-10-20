@@ -27,13 +27,13 @@ if ( ! ($?iterm2_shell_integration_installed)) then
 
     # Inside tmux (TERM=tmux*, or $TMUX set when tmux uses a screen* TERM), tmux Integration passes
     # the escape codes on intact and plain tmux discards them, so this loads; TERM=tmux* also
-    # reaches a host sshed to from a tmux pane. TERM=screen* without $TMUX is screen, or tmux beyond
-    # an ssh hop, and is skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it on.
+    # reaches a host sshed to from a tmux pane. So does TERM=screen-256color, which many tmux users
+    # set. Other screen* TERMs without $TMUX are screen, or tmux beyond an ssh hop, and are skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it on.
     set _iterm2_in_tmux = 0
     if ( $?TMUX ) then
       if ( "$TMUX" != "" ) set _iterm2_in_tmux = 1
     endif
-    if ( ( x"$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX" != x || $_iterm2_in_tmux || "$TERM" !~ screen* ) && x"$TERM" != xlinux && x"$TERM" != xdumb ) then
+    if ( ( x"$ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX" != x || $_iterm2_in_tmux || "$TERM" !~ screen* || x"$TERM" == xscreen-256color ) && x"$TERM" != xlinux && x"$TERM" != xdumb ) then
 
 
       set iterm2_shell_integration_installed="yes"

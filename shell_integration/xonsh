@@ -80,11 +80,12 @@ class _iTerm2Xonsh:
 
         # Inside tmux (TERM=tmux*, or $TMUX set when tmux uses a screen* TERM), tmux Integration
         # passes the escape codes on intact and plain tmux discards them, so this loads; TERM=tmux*
-        # also reaches a host sshed to from a tmux pane. TERM=screen* without $TMUX is screen, or
-        # tmux beyond an ssh hop, and is skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it.
+        # also reaches a host sshed to from a tmux pane. So does TERM=screen-256color, which many
+        # tmux users set. Other screen* TERMs without $TMUX are screen, or tmux beyond an ssh hop,
+        # and are skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces it.
         tmux_enabled = @.env.get('ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX')
         in_tmux = bool(@.env.get('TMUX', '')) or term.startswith('tmux')
-        if not tmux_enabled and not in_tmux and term.startswith('screen'):
+        if not tmux_enabled and not in_tmux and term.startswith('screen') and term != 'screen-256color':
             if $ITERM2_INTEGRATION_DEBUG:
                 self.print_err('iTerm2 Integration: screen is not supported.')
             return False
