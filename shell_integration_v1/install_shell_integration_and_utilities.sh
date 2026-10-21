@@ -41,6 +41,9 @@ HOME_PREFIX='${HOME}'
 DOTDIR="$HOME"
 SHELL_AND='&&'
 QUOTE=''
+# Set by shells that load the script from a directory instead of from a dotfile.
+FILENAME_OVERRIDE=''
+NO_DOTFILE=''
 if [ "${SHELL}" = tcsh ]
 then
   URL="https://iterm2.com/shell_integration/tcsh"
@@ -98,10 +101,14 @@ then
     CONFIG_HOME="${HOME}/.config"
   fi
   mkdir -p "${CONFIG_HOME}/xonsh/rc.d/"
-  SCRIPT="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
-  HOME_PREFIX='{$HOME}'
-  QUOTE='"'
-  PATH_LINE="\$PATH.insert(0, \"$HOME_PREFIX/.iterm2\")"
+  # xonsh runs every .xsh file in rc.d at startup, so the script goes there
+  # directly and there is no dotfile to edit. This also replaces the source
+  # line older installers wrote to this file, which never worked: xonsh keeps
+  # the braces in "{$HOME}", and its source refuses a .xonsh extension.
+  FILENAME_OVERRIDE="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
+  NO_DOTFILE=1
+  # shellcheck disable=SC2016 # xonsh code, $PATH and $HOME are for xonsh to expand
+  PATH_LINE='$PATH.insert(0, $HOME + "/.iterm2")'
 fi
 if [ "${URL}" = "" ]
 then
@@ -109,19 +116,21 @@ then
   exit 1
 fi
 
-FILENAME="${DOTDIR}/.iterm2_shell_integration.${SHELL}"
+FILENAME="${FILENAME_OVERRIDE:-${DOTDIR}/.iterm2_shell_integration.${SHELL}}"
 RELATIVE_FILENAME="${HOME_PREFIX}/.iterm2_shell_integration.${SHELL}"
 echo "Downloading script from ${URL} and saving it to ${FILENAME}..."
 curl -SsL "${URL}" > "${FILENAME}" || die "Couldn't download script from ${URL}"
 chmod +x "${FILENAME}"
-echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
-if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "Checking if ${SCRIPT} contains iterm2_shell_integration..."
+  if ! grep iterm2_shell_integration "${SCRIPT}" > /dev/null 2>&1; then
 	echo "Appending source command to ${SCRIPT}..."
 	cat <<-EOF >> "${SCRIPT}"
 
 	test -e ${QUOTE}${RELATIVE_FILENAME}${QUOTE} ${SHELL_AND} source ${QUOTE}${RELATIVE_FILENAME}${QUOTE}
 
 EOF
+  fi
 fi
 
 test -d "$DOTDIR/.iterm2" || mkdir "$DOTDIR/.iterm2"
@@ -145,7 +154,11 @@ echo ""
 echo "To make it work right now, do:"
 echo "  source ${FILENAME}"
 echo
-echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+if [ -z "${NO_DOTFILE}" ]; then
+  echo "This line was also added to ${SCRIPT}, so the next time you log in it will be loaded automatically."
+else
+  echo "It went into a directory ${SHELL} loads at startup, so the next time you log in it will be loaded automatically."
+fi
 echo ""
 echo "--------------------------------------------------------------------------------"
 echo ""

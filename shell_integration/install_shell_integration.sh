@@ -83,9 +83,12 @@ then
     CONFIG_HOME="${HOME}/.config"
   fi
   mkdir -p "${CONFIG_HOME}/xonsh/rc.d/"
-  SCRIPT="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
-  HOME_PREFIX='{$HOME}'
-  QUOTE='"'
+  # xonsh runs every .xsh file in rc.d at startup, so the script goes there
+  # directly and there is no dotfile to edit. This also replaces the source
+  # line older installers wrote to this file, which never worked: xonsh keeps
+  # the braces in "{$HOME}", and its source refuses a .xonsh extension.
+  FILENAME_OVERRIDE="${CONFIG_HOME}/xonsh/rc.d/iterm2.xsh"
+  NO_DOTFILE=1
 fi
 if [ "${SHELL}" = nu ]
 then
