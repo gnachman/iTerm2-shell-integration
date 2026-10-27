@@ -239,9 +239,14 @@ def "iterm2 hook-registered" [] {
 
 # Don't run in IDE terminals. TERM_PROGRAM is set by the local terminal
 # but not forwarded over SSH. LC_TERMINAL is set by iTerm2 and may be
-# forwarded over SSH. Shell integration does not work under tmux or
-# screen unless you opt in with
-# ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX.
+# forwarded over SSH. Inside tmux (TERM=tmux*, or $TMUX set when tmux
+# uses a screen* TERM), tmux Integration passes the escape codes on
+# intact and plain tmux discards them, so this loads, as the other
+# shells' integration does; TERM=tmux* also reaches a host sshed to from
+# a tmux pane. So does TERM=screen-256color, which many tmux users set.
+# Other screen* TERMs without $TMUX are screen, or tmux beyond an ssh
+# hop, and are skipped. ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX forces
+# it on. In tmux, TERM_PROGRAM is tmux's own.
 #
 # ITERM_SHELL_INTEGRATION_INSTALLED is read but never written. It is a
 # deliberate opt-out: someone who exports it is asking every shell to
@@ -252,6 +257,7 @@ def "iterm2 hook-registered" [] {
 # iterm2 hook-registered, which needs no environment variable.
 let iterm2_term = ($env.TERM? | default "")
 let iterm2_term_program = ($env.TERM_PROGRAM? | default "")
+let iterm2_in_tmux = (($env.TMUX? | default "") != "")
 let iterm2_active = (
     $nu.is-interactive
     and ($env.ITERM_SHELL_INTEGRATION_INSTALLED? | default "") == ""
@@ -260,11 +266,14 @@ let iterm2_active = (
         $iterm2_term_program == ""
         or $iterm2_term_program == "iTerm.app"
         or ($env.LC_TERMINAL? | default "") == "iTerm2"
+        or ($iterm2_term_program == "tmux" and ($iterm2_in_tmux or ($iterm2_term | str starts-with "tmux")))
     )
     and $iterm2_term not-in ["linux", "dumb"]
     and (
         ($env.ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX? | default "") != ""
-        or $iterm2_term not-in ["screen", "screen-256color", "tmux-256color"]
+        or $iterm2_in_tmux
+        or not ($iterm2_term | str starts-with "screen")
+        or $iterm2_term == "screen-256color"
     )
 )
 
@@ -285,6 +294,26 @@ if $iterm2_active {
     )
     iterm2 report-state $iterm2_machine_id
     iterm2 osc "1337;ShellIntegrationVersion=1;shell=nu"
+}
+
+# Put iTerm2's uploaded it2 first on PATH, as the other shells' integration
+# does, so a program started from this shell (a Claude Code hook through
+# `sh -c`, an agent's Bash tool) finds iTerm2's it2 rather than another
+# one. Only when the directory exists, so a host iTerm2 never uploaded to
+# keeps a clean PATH; moved to the front if it is already there, and never
+# duplicated. PATH is a list once nushell has started, but may still be a
+# string this early.
+let iterm2_home = ($env.HOME? | default "")
+let iterm2_bin = ($iterm2_home | path join ".iterm2" "bin")
+if $iterm2_home != "" and ($iterm2_bin | path exists) {
+    let iterm2_current = ($env.PATH? | default [])
+    let iterm2_path = if (($iterm2_current | describe) | str starts-with "list") {
+        $iterm2_current
+    } else {
+        $iterm2_current | split row (char esep)
+    }
+    # $it rather than a closure, which `where` takes only from 0.105 on.
+    $env.PATH = ([$iterm2_bin] | append ($iterm2_path | where $it != $iterm2_bin))
 }
 
 # it2 CLI over iTerm2 SSH integration: materialize the embedded copy
@@ -318,7 +347,7 @@ def --wrapped it2 [...args] {
         if not ($target | path exists) {
             let blob = "${IT2_PY_B64}"
             let materialize = (do --ignore-errors {
-                ^$py -c 'import base64,glob,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2]); [os.remove(f) for f in glob.glob(os.path.join(d,"it2*.py")) if f!=sys.argv[2]]' $blob $target | complete
+                ^$py -c 'import base64,gzip,os,sys,tempfile; d=os.path.expanduser("~/.iterm2"); os.makedirs(d,exist_ok=True); data=gzip.decompress(base64.b64decode(sys.argv[1])); fd,tmp=tempfile.mkstemp(dir=d); os.write(fd,data); os.close(fd); os.replace(tmp,sys.argv[2])' $blob $target | complete
             })
             if ($materialize | is-empty) or $materialize.exit_code != 0 {
                 error make --unspanned {msg: "it2: could not be installed"}
