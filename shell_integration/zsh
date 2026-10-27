@@ -302,12 +302,16 @@ fi
 # Bash tool does too, and neither sees a shell function. Done here rather than from the app
 # because the real PATH is only known in the login shell; the conductor cannot express a prepend
 # (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
-# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
-# on absence from PATH, so re-sourcing does not stack duplicates.
-case ":${PATH}:" in
-  *":${HOME}/.iterm2/bin:"*) ;;
-  *) [ -d "${HOME}/.iterm2/bin" ] && PATH="${HOME}/.iterm2/bin:${PATH}" && export PATH ;;
-esac
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH. Moved
+# to the front if it is already on PATH, so iTerm2's it2 wins over any other (a login profile's
+# path_helper or a `brew shellenv` may have put other directories ahead of it), and never
+# duplicated, so re-sourcing does not stack copies.
+if [[ -d "${HOME}/.iterm2/bin" ]]; then
+  # Quoted, (@) and [@] so the user's options (KSH_ARRAYS, SH_WORD_SPLIT, GLOB_SUBST) can't
+  # truncate PATH, split an entry with a space, or treat $HOME as a pattern.
+  path=("${HOME}/.iterm2/bin" "${(@)path[@]:#"${HOME}/.iterm2/bin"}")
+  export PATH
+fi
 
 # it2 CLI over iTerm2 SSH integration (see bash for details).
 if ! command -v it2 > /dev/null 2>&1; then

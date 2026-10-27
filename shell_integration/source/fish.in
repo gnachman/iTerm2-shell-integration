@@ -299,10 +299,19 @@ end
 # Bash tool does too, and neither sees a shell function. Done here rather than from the app
 # because the real PATH is only known in the login shell; the conductor cannot express a prepend
 # (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
-# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
-# on absence from PATH, so re-sourcing does not stack duplicates.
-if test -d "$HOME/.iterm2/bin"; and not contains "$HOME/.iterm2/bin" $PATH
-    set -gx PATH "$HOME/.iterm2/bin" $PATH
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH. Moved
+# to the front if it is already on PATH, so iTerm2's it2 wins over any other (a login profile's
+# path_helper or a `brew shellenv` may have put other directories ahead of it), and never
+# duplicated, so re-sourcing does not stack copies.
+if test -d "$HOME/.iterm2/bin"
+    set -l __iterm2_rest
+    set -l __iterm2_dir
+    for __iterm2_dir in $PATH
+        if test "$__iterm2_dir" != "$HOME/.iterm2/bin"
+            set __iterm2_rest $__iterm2_rest $__iterm2_dir
+        end
+    end
+    set -gx PATH "$HOME/.iterm2/bin" $__iterm2_rest
 end
 
 # it2 CLI over iTerm2 SSH integration: define it2 (materializing the embedded copy,

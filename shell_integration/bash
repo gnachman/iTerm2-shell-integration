@@ -998,12 +998,21 @@ fi
 # Bash tool does too, and neither sees a shell function. Done here rather than from the app
 # because the real PATH is only known in the login shell; the conductor cannot express a prepend
 # (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
-# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
-# on absence from PATH, so re-sourcing does not stack duplicates.
-case ":${PATH}:" in
-  *":${HOME}/.iterm2/bin:"*) ;;
-  *) [ -d "${HOME}/.iterm2/bin" ] && PATH="${HOME}/.iterm2/bin:${PATH}" && export PATH ;;
-esac
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH. Moved
+# to the front if it is already on PATH, so iTerm2's it2 wins over any other (a login profile's
+# path_helper or a `brew shellenv` may have put other directories ahead of it), and never
+# duplicated, so re-sourcing does not stack copies.
+# Split with read rather than a pattern substitution, which macOS's bash 3.2 quotes differently.
+if [ -d "${HOME}/.iterm2/bin" ]; then
+  IFS=: read -r -a _iterm2_dirs <<< "$PATH"
+  _iterm2_path="${HOME}/.iterm2/bin"
+  for _iterm2_dir in ${_iterm2_dirs[@]+"${_iterm2_dirs[@]}"}; do
+    [ "$_iterm2_dir" = "${HOME}/.iterm2/bin" ] || _iterm2_path="${_iterm2_path}:${_iterm2_dir}"
+  done
+  PATH="$_iterm2_path"
+  export PATH
+  unset _iterm2_dirs _iterm2_dir _iterm2_path
+fi
 
 # it2 CLI over iTerm2 SSH integration: unless it2 already exists, define it as a
 # function that materializes the embedded copy on first use (named by content hash,

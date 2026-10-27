@@ -307,12 +307,16 @@ __xonsh__.iterm2 = _iTerm2Xonsh()
 # Bash tool does too, and neither sees a shell function. Done here rather than from the app
 # because the real PATH is only known in the login shell; the conductor cannot express a prepend
 # (its setenv does no re-expansion) and an absolute value there would break conductor.sh itself.
-# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH, and
-# on absence from PATH, so re-sourcing does not stack duplicates.
+# Guarded on the directory existing, so a host iTerm2 never uploaded to keeps a clean PATH. Moved
+# to the front if it is already on PATH, so iTerm2's it2 wins over any other (a login profile's
+# path_helper or a `brew shellenv` may have put other directories ahead of it), and never
+# duplicated, so re-sourcing does not stack copies.
 import os as _iterm2_os
 _iterm2_bin = _iterm2_os.path.expanduser("~/.iterm2/bin")
-if _iterm2_os.path.isdir(_iterm2_bin) and _iterm2_bin not in $PATH:
-    $PATH.insert(0, _iterm2_bin)
+if _iterm2_os.path.isdir(_iterm2_bin):
+    # Rebuilt rather than removed from: `in` compares expanded entries but EnvPath.remove compares
+    # the stored ones, so a stored ~/.iterm2/bin could never be removed.
+    $PATH = [_iterm2_bin] + [_iterm2_p for _iterm2_p in $PATH if _iterm2_p != _iterm2_bin]
 del _iterm2_bin
 
 # it2 CLI over iTerm2 SSH integration: materialize the embedded copy (named by
