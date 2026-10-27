@@ -230,21 +230,15 @@ sanitized="stty -echo -isig; $send_conductor"';s="";IFS=""; while read -r l;do [
 # for the answer would hold the terminal until Return. ssh runs LocalCommand only after it
 # connects, so have it remove a marker file. That would replace a LocalCommand the user
 # configured, and a connection made through a ControlMaster runs none, so skip the marker for
-# those and always wait, as before. If ssh -G fails, as for an option ssh rejects, the marker
-# is used anyway.
+# those and always wait, as before. If ssh -G fails, ssh will fail too.
 CONNECT_MARKER=""
 CONNECT_ARGS=()
 SSH_CONFIG=$("$SSH" -G "${USER_ARGS[@]}" -- "$HOSTNAME" 2> /dev/null || true)
 if ! printf '%s\n' "$SSH_CONFIG" | grep -i -E '^(localcommand |controlpath )' | grep -v -i -x 'controlpath none' > /dev/null; then
     CONNECT_MARKER=$(mktemp "${TMPDIR:-/tmp}/it2ssh.XXXXXX" 2> /dev/null || true)
     if [ -n "$CONNECT_MARKER" ]; then
-        # % starts a token in LocalCommand, which ssh runs with $SHELL, so single-quote the path:
-        # every shell understands that.
-        quoted_marker=${CONNECT_MARKER//%/%%}
-        sq="'"
-        sq_escaped="'\\''"
-        quoted_marker="'${quoted_marker//$sq/$sq_escaped}'"
-        CONNECT_ARGS=(-o PermitLocalCommand=yes -o "LocalCommand=rm -f $quoted_marker")
+        # % starts a token in LocalCommand.
+        CONNECT_ARGS=(-o PermitLocalCommand=yes -o "LocalCommand=rm -f $(printf %q "${CONNECT_MARKER//%/%%}")")
         trap 'rm -f "$CONNECT_MARKER"' EXIT
     fi
 fi
