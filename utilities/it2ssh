@@ -225,10 +225,29 @@ send_conductor='printf "%s '"$intro"'"'
 esc=$(printf "\033")
 sanitized="stty -echo -isig; $send_conductor"';s="";IFS=""; while read -r l;do [ "$l" = "-- BEGIN CONDUCTOR --" ]&&break; done; while read -r l; do [ "$l" = "'$esc'" ]&&break; s=$(printf "%s\n%s" "$s" "$l"); done; unset IFS; s=$(echo "$s" | { command -v base64 > /dev/null 2> /dev/null && command base64 -d || { command -v b64encode > /dev/null 2> /dev/null && command fold -w 76 | command b64decode -r; } || echo "echo base64 not available on remote host"; }); eval "$s"'
 
+# After ssh exits, iTerm2 answers EndSSH only for a connection it was asked to start. When ssh
+# fails before connecting (a mistyped host, an option ssh rejects) nothing was asked, so waiting
+# for the answer would hold the terminal until Return. ssh runs LocalCommand only after it
+# connects, so have it remove a marker file. That would replace a LocalCommand the user
+# configured, and a connection made through a ControlMaster runs none, so skip the marker for
+# those and always wait, as before. If ssh -G fails, ssh will fail too.
+CONNECT_MARKER=""
+CONNECT_ARGS=()
+SSH_CONFIG=$("$SSH" -G "${USER_ARGS[@]}" -- "$HOSTNAME" 2> /dev/null || true)
+if ! printf '%s\n' "$SSH_CONFIG" | grep -i -E '^(localcommand |controlpath )' | grep -v -i -x 'controlpath none' > /dev/null; then
+    CONNECT_MARKER=$(mktemp "${TMPDIR:-/tmp}/it2ssh.XXXXXX" 2> /dev/null || true)
+    if [ -n "$CONNECT_MARKER" ]; then
+        # % starts a token in LocalCommand.
+        CONNECT_ARGS=(-o PermitLocalCommand=yes -o "LocalCommand=rm -f $(printf %q "${CONNECT_MARKER//%/%%}")")
+        trap 'rm -f "$CONNECT_MARKER"' EXIT
+    fi
+fi
+
 # If ssh gets a signal, let it2ssh keep running.
 set +e
 
 $SSH \
+${CONNECT_ARGS[@]+"${CONNECT_ARGS[@]}"} \
 "${USER_ARGS[@]}" \
 -- \
 "$HOSTNAME" \
@@ -237,7 +256,15 @@ sh \
 -c \
 "$eval_cmd" \
 \'"$sanitized"\'
+SSH_STATUS=$?
 
+if [ -n "$CONNECT_MARKER" ] && [ -e "$CONNECT_MARKER" ]; then
+    rm -f "$CONNECT_MARKER"
+    # 255 is ssh's own failure. ssh never connected, so there is no EndSSH answer to wait for.
+    if [ "$SSH_STATUS" -eq 255 ]; then
+        exit "$SSH_STATUS"
+    fi
+fi
 
 stty_settings=$(command stty -g)
 cleanup() {
@@ -258,3 +285,4 @@ while read l; do
 done
 
 cleanup
+exit "$SSH_STATUS"
